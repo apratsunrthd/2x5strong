@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>2x5 Strong — Login</title>
+  <link rel="stylesheet" href="css/style.css">
+  <style>
+    .auth-page {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 24px 20px;
+    }
+
+    .auth-logo {
+      font-family: var(--font-d);
+      font-size: 42px;
+      font-weight: 900;
+      letter-spacing: 2px;
+      color: var(--accent);
+      margin-bottom: 6px;
+      text-align: center;
+    }
+    .auth-logo span { color: var(--muted); font-weight: 400; }
+
+    .auth-tagline {
+      color: var(--muted);
+      font-size: 14px;
+      text-align: center;
+      margin-bottom: 36px;
+      max-width: 280px;
+      line-height: 1.6;
+    }
+
+    .auth-box {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 28px 28px 24px;
+      width: 100%;
+      max-width: 380px;
+    }
+
+    .auth-tabs {
+      display: flex;
+      background: var(--surface2);
+      border-radius: var(--radius-sm);
+      padding: 3px;
+      margin-bottom: 24px;
+    }
+    .auth-tab {
+      flex: 1;
+      padding: 8px;
+      border: none;
+      background: transparent;
+      color: var(--muted);
+      font-family: var(--font-d);
+      font-size: 14px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .auth-tab.active {
+      background: var(--surface);
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+
+    .auth-form { display: none; }
+    .auth-form.active { display: block; }
+
+    .color-row {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .color-opt {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      cursor: pointer;
+      border: 3px solid transparent;
+      transition: border-color 0.12s, transform 0.1s;
+    }
+    .color-opt:hover { transform: scale(1.1); }
+    .color-opt.selected { border-color: var(--text); }
+
+    .divider {
+      border: none;
+      border-top: 1px solid var(--border);
+      margin: 20px 0;
+    }
+
+    .auth-switch {
+      text-align: center;
+      font-size: 13px;
+      color: var(--muted);
+      margin-top: 16px;
+    }
+    .auth-switch button {
+      background: none;
+      border: none;
+      color: var(--accent);
+      cursor: pointer;
+      font-size: 13px;
+      padding: 0;
+      text-decoration: underline;
+    }
+
+    .auth-error {
+      background: var(--danger-bg);
+      border: 1px solid var(--danger);
+      border-radius: var(--radius-sm);
+      padding: 10px 14px;
+      font-size: 13px;
+      color: var(--danger);
+      margin-bottom: 16px;
+      display: none;
+    }
+    .auth-error.visible { display: block; }
+
+    .reset-link {
+      text-align: right;
+      font-size: 12px;
+      margin-top: -10px;
+      margin-bottom: 16px;
+    }
+    .reset-link button {
+      background: none;
+      border: none;
+      color: var(--muted);
+      cursor: pointer;
+      font-size: 12px;
+      padding: 0;
+    }
+    .reset-link button:hover { color: var(--text); }
+
+    .success-msg {
+      background: var(--success-bg);
+      border: 1px solid var(--success);
+      border-radius: var(--radius-sm);
+      padding: 12px 14px;
+      font-size: 13px;
+      color: var(--success);
+      line-height: 1.5;
+      display: none;
+    }
+    .success-msg.visible { display: block; }
+  </style>
+</head>
+<body>
+
+<div class="auth-page">
+  <div class="auth-logo">2X5 <span>STRONG</span></div>
+  <p class="auth-tagline">Two days lifting. Four days moving. Strength built around your full life.</p>
+
+  <div class="auth-box">
+    <div class="auth-tabs">
+      <button class="auth-tab active" id="tab-login" onclick="switchTab('login')">SIGN IN</button>
+      <button class="auth-tab" id="tab-signup" onclick="switchTab('signup')">SIGN UP</button>
+    </div>
+
+    <!-- Login Form -->
+    <div class="auth-form active" id="form-login">
+      <div class="auth-error" id="login-error"></div>
+      <div class="success-msg" id="reset-success">Check your email for a password reset link.</div>
+
+      <div class="form-group">
+        <label class="form-label">Email</label>
+        <input class="form-input" type="email" id="login-email" placeholder="you@example.com" autocomplete="email">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Password</label>
+        <input class="form-input" type="password" id="login-password" placeholder="••••••••" autocomplete="current-password">
+      </div>
+      <div class="reset-link">
+        <button onclick="handleReset()">Forgot password?</button>
+      </div>
+      <button class="btn btn-primary" id="login-btn" onclick="handleLogin()">SIGN IN</button>
+
+      <div class="auth-switch">
+        No account? <button onclick="switchTab('signup')">Sign up free</button>
+      </div>
+    </div>
+
+    <!-- Signup Form -->
+    <div class="auth-form" id="form-signup">
+      <div class="auth-error" id="signup-error"></div>
+      <div class="success-msg" id="signup-success">
+        Account created! Check your email to confirm your address, then sign in.
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Your Name</label>
+        <input class="form-input" type="text" id="signup-name" placeholder="e.g. Brad" maxlength="30" autocomplete="name">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Profile Color</label>
+        <div class="color-row" id="color-picker"></div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Email</label>
+        <input class="form-input" type="email" id="signup-email" placeholder="you@example.com" autocomplete="email">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Password</label>
+        <input class="form-input" type="password" id="signup-password" placeholder="8+ characters" autocomplete="new-password">
+      </div>
+      <button class="btn btn-primary" id="signup-btn" onclick="handleSignup()">CREATE ACCOUNT</button>
+
+      <div class="auth-switch">
+        Have an account? <button onclick="switchTab('login')">Sign in</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<script type="module">
+  import { getSession, signIn, signUp, sendPasswordReset } from './js/auth.js';
+
+  // Redirect if already logged in
+  (async () => {
+    const session = await getSession();
+    if (session) window.location.href = 'app.html';
+  })();
+
+  // Color picker
+  const COLORS = ['#e8d44d','#a07cf8','#52c97a','#5297e0','#e05252','#f0923b','#e052c9','#52e0d4'];
+  let selectedColor = COLORS[0];
+
+  function buildColorPicker() {
+    const row = document.getElementById('color-picker');
+    row.innerHTML = '';
+    COLORS.forEach(c => {
+      const d = document.createElement('div');
+      d.className = 'color-opt' + (c === selectedColor ? ' selected' : '');
+      d.style.background = c;
+      d.onclick = () => { selectedColor = c; buildColorPicker(); };
+      row.appendChild(d);
+    });
+  }
+  buildColorPicker();
+
+  // Tab switching
+  window.switchTab = function(tab) {
+    ['login','signup'].forEach(t => {
+      document.getElementById(`tab-${t}`).classList.toggle('active', t === tab);
+      document.getElementById(`form-${t}`).classList.toggle('active', t === tab);
+    });
+  };
+
+  // Login
+  window.handleLogin = async function() {
+    const email = document.getElementById('login-email').value.trim();
+    const password = document.getElementById('login-password').value;
+    const errEl = document.getElementById('login-error');
+    const btn = document.getElementById('login-btn');
+
+    errEl.classList.remove('visible');
+    if (!email || !password) { errEl.textContent = 'Please fill in all fields.'; errEl.classList.add('visible'); return; }
+
+    btn.innerHTML = '<span class="spinner"></span>';
+    btn.disabled = true;
+
+    try {
+      await signIn({ email, password });
+      window.location.href = 'app.html';
+    } catch (e) {
+      errEl.textContent = e.message || 'Sign in failed. Check your credentials.';
+      errEl.classList.add('visible');
+      btn.textContent = 'SIGN IN';
+      btn.disabled = false;
+    }
+  };
+
+  // Signup
+  window.handleSignup = async function() {
+    const name = document.getElementById('signup-name').value.trim();
+    const email = document.getElementById('signup-email').value.trim();
+    const password = document.getElementById('signup-password').value;
+    const errEl = document.getElementById('signup-error');
+    const successEl = document.getElementById('signup-success');
+    const btn = document.getElementById('signup-btn');
+
+    errEl.classList.remove('visible');
+    successEl.classList.remove('visible');
+
+    if (!name || !email || !password) { errEl.textContent = 'Please fill in all fields.'; errEl.classList.add('visible'); return; }
+    if (password.length < 8) { errEl.textContent = 'Password must be at least 8 characters.'; errEl.classList.add('visible'); return; }
+
+    btn.innerHTML = '<span class="spinner"></span>';
+    btn.disabled = true;
+
+    try {
+      await signUp({ email, password, displayName: name, color: selectedColor });
+      successEl.classList.add('visible');
+      btn.textContent = 'CREATE ACCOUNT';
+      btn.disabled = false;
+    } catch (e) {
+      errEl.textContent = e.message || 'Sign up failed. Please try again.';
+      errEl.classList.add('visible');
+      btn.textContent = 'CREATE ACCOUNT';
+      btn.disabled = false;
+    }
+  };
+
+  // Password reset
+  window.handleReset = async function() {
+    const email = document.getElementById('login-email').value.trim();
+    const errEl = document.getElementById('login-error');
+    const successEl = document.getElementById('reset-success');
+
+    if (!email) { errEl.textContent = 'Enter your email address first.'; errEl.classList.add('visible'); return; }
+    try {
+      await sendPasswordReset(email);
+      errEl.classList.remove('visible');
+      successEl.classList.add('visible');
+    } catch (e) {
+      errEl.textContent = e.message || 'Could not send reset email.';
+      errEl.classList.add('visible');
+    }
+  };
+
+  // Enter key on password field
+  document.getElementById('login-password').addEventListener('keydown', e => {
+    if (e.key === 'Enter') window.handleLogin();
+  });
+  document.getElementById('signup-password').addEventListener('keydown', e => {
+    if (e.key === 'Enter') window.handleSignup();
+  });
+</script>
+
+</body>
+</html>
