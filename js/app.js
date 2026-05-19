@@ -717,6 +717,22 @@ async function renderHistory() {
 
 const LIFT_NAMES = { squat:'Squat', bench:'Bench Press', row:'Barbell Row', press:'Overhead Press', deadlift:'Deadlift' };
 
+// Builds the per-lift increment rows for the settings panel
+function buildIncrementRows() {
+  const settings = getGlobalSettings();
+  const allLifts = [...WORKOUT_A, ...WORKOUT_B].filter((l, i, a) => a.findIndex(x => x.id === l.id) === i);
+  return allLifts.map(l => {
+    const eff = effectiveIncrement(l.increment, settings.minIncrement);
+    const capped = eff > l.increment
+      ? ' <span style="color:var(--muted2);font-size:11px;">(natural ' + l.increment + ' lb)</span>'
+      : '';
+    return '<div class="settings-row">'
+      + '<div><div class="settings-label">' + l.name + ' increment</div></div>'
+      + '<span style="font-family:var(--font-d);font-weight:700;color:var(--accent);">+' + eff + ' lb' + capped + '</span>'
+      + '</div>';
+  }).join('');
+}
+
 function renderSettings() {
   const container = document.getElementById('settings-container');
 
@@ -785,21 +801,7 @@ function renderSettings() {
           <button class="btn btn-ghost btn-sm" onclick="editMinIncrement()">EDIT</button>
         </div>
       </div>
-      ${(() => {
-        const settings = getGlobalSettings();
-        const allLifts = [...WORKOUT_A, ...WORKOUT_B].filter((l,i,a) => a.findIndex(x=>x.id===l.id)===i);
-        return allLifts.map(l => {
-          const eff = effectiveIncrement(l.increment, settings.minIncrement);
-          const natural = l.increment;
-          const capped = eff > natural ? ` <span style="color:var(--muted2);font-size:11px;">(natural ${natural} lb)</span>` : '';
-          return \`<div class="settings-row">
-            <div>
-              <div class="settings-label">\${l.name} increment</div>
-            </div>
-            <span style="font-family:var(--font-d);font-weight:700;color:var(--accent);">+\${eff} lb\${capped}</span>
-          </div>\`;
-        }).join('');
-      })()}
+      ${buildIncrementRows()}
     </div>
 
     <div class="settings-section">
