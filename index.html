@@ -223,21 +223,14 @@
 
 <div id="toast" class="toast"></div>
 
-<script type="module">
-  import { getSession, signIn, signUp, sendPasswordReset } from './js/auth.js';
-
-  // Redirect if already logged in
-  (async () => {
-    const session = await getSession();
-    if (session) window.location.href = 'app.html';
-  })();
-
-  // Color picker
+<script>
+  // Color picker — no module needed, runs immediately
   const COLORS = ['#e8d44d','#a07cf8','#52c97a','#5297e0','#e05252','#f0923b','#e052c9','#52e0d4'];
   let selectedColor = COLORS[0];
 
   function buildColorPicker() {
     const row = document.getElementById('color-picker');
+    if (!row) return;
     row.innerHTML = '';
     COLORS.forEach(c => {
       const d = document.createElement('div');
@@ -250,15 +243,15 @@
   buildColorPicker();
 
   // Tab switching
-  window.switchTab = function(tab) {
+  function switchTab(tab) {
     ['login','signup'].forEach(t => {
-      document.getElementById(`tab-${t}`).classList.toggle('active', t === tab);
-      document.getElementById(`form-${t}`).classList.toggle('active', t === tab);
+      document.getElementById('tab-' + t).classList.toggle('active', t === tab);
+      document.getElementById('form-' + t).classList.toggle('active', t === tab);
     });
-  };
+  }
 
   // Login
-  window.handleLogin = async function() {
+  async function handleLogin() {
     const email = document.getElementById('login-email').value.trim();
     const password = document.getElementById('login-password').value;
     const errEl = document.getElementById('login-error');
@@ -271,6 +264,7 @@
     btn.disabled = true;
 
     try {
+      const { signIn } = await import('./js/auth.js');
       await signIn({ email, password });
       window.location.href = 'app.html';
     } catch (e) {
@@ -279,10 +273,10 @@
       btn.textContent = 'SIGN IN';
       btn.disabled = false;
     }
-  };
+  }
 
   // Signup
-  window.handleSignup = async function() {
+  async function handleSignup() {
     const name = document.getElementById('signup-name').value.trim();
     const email = document.getElementById('signup-email').value.trim();
     const password = document.getElementById('signup-password').value;
@@ -300,6 +294,7 @@
     btn.disabled = true;
 
     try {
+      const { signUp } = await import('./js/auth.js');
       await signUp({ email, password, displayName: name, color: selectedColor });
       successEl.classList.add('visible');
       btn.textContent = 'CREATE ACCOUNT';
@@ -310,16 +305,17 @@
       btn.textContent = 'CREATE ACCOUNT';
       btn.disabled = false;
     }
-  };
+  }
 
   // Password reset
-  window.handleReset = async function() {
+  async function handleReset() {
     const email = document.getElementById('login-email').value.trim();
     const errEl = document.getElementById('login-error');
     const successEl = document.getElementById('reset-success');
 
     if (!email) { errEl.textContent = 'Enter your email address first.'; errEl.classList.add('visible'); return; }
     try {
+      const { sendPasswordReset } = await import('./js/auth.js');
       await sendPasswordReset(email);
       errEl.classList.remove('visible');
       successEl.classList.add('visible');
@@ -327,14 +323,25 @@
       errEl.textContent = e.message || 'Could not send reset email.';
       errEl.classList.add('visible');
     }
-  };
+  }
 
-  // Enter key on password field
-  document.getElementById('login-password').addEventListener('keydown', e => {
-    if (e.key === 'Enter') window.handleLogin();
-  });
-  document.getElementById('signup-password').addEventListener('keydown', e => {
-    if (e.key === 'Enter') window.handleSignup();
+  // Redirect if already logged in
+  (async () => {
+    try {
+      const { getSession } = await import('./js/auth.js');
+      const session = await getSession();
+      if (session) window.location.href = 'app.html';
+    } catch(e) { /* not logged in or supabase not ready */ }
+  })();
+
+  // Enter key handlers
+  document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('login-password').addEventListener('keydown', e => {
+      if (e.key === 'Enter') handleLogin();
+    });
+    document.getElementById('signup-password').addEventListener('keydown', e => {
+      if (e.key === 'Enter') handleSignup();
+    });
   });
 </script>
 
