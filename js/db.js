@@ -63,6 +63,12 @@ export async function getSessions(userId, limit = 50) {
         weight,
         sets_json,
         sets_passed
+      ),
+      accessory_logs (
+        exercise_name,
+        exercise_type,
+        sets_json,
+        sort_order
       )
     `)
     .eq('user_id', userId)
@@ -125,4 +131,77 @@ export async function getPersonalRecords(userId) {
     }
   });
   return records;
+}
+
+// ── Accessory Exercises ───────────────────────────────────────
+
+export async function getCustomExercises(userId) {
+  const { data, error } = await supabase
+    .from('accessory_exercises')
+    .select('*')
+    .eq('user_id', userId)
+    .order('name');
+  if (error) throw error;
+  return data || [];
+}
+
+export async function addCustomExercise(userId, { name, category, exercise_type }) {
+  const { data, error } = await supabase
+    .from('accessory_exercises')
+    .insert({ user_id: userId, name, category, exercise_type })
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+export async function deleteCustomExercise(userId, id) {
+  const { error } = await supabase
+    .from('accessory_exercises')
+    .delete()
+    .eq('id', id)
+    .eq('user_id', userId);
+  if (error) throw error;
+}
+
+// ── Accessory Logs ────────────────────────────────────────────
+
+export async function saveAccessoryLogs(sessionId, userId, accessories) {
+  if (!accessories || accessories.length === 0) return;
+  const rows = accessories.map((a, i) => ({
+    session_id: sessionId,
+    user_id: userId,
+    exercise_name: a.name,
+    exercise_type: a.type,
+    category: a.category,
+    sets_json: a.sets,
+    sort_order: i,
+  }));
+  const { error } = await supabase.from('accessory_logs').insert(rows);
+  if (error) throw error;
+}
+
+export async function getLastAccessoryLogs(userId) {
+  // Get the most recent session with accessories, then fetch its logs
+  const { data: recentSessions, error: sErr } = await supabase
+    .from('sessions')
+    .select('id')
+    .eq('user_id', userId)
+    .order('completed_at', { ascending: false })
+    .limit(5);
+  if (sErr) throw sErr;
+  if (!recentSessions || recentSessions.length === 0) return [];
+
+  // Find the most recent session that has accessory logs
+  for (const session of recentSessions) {
+    const { data, error } = await supabase
+      .from('accessory_logs')
+      .select('*')
+      .eq('session_id', session.id)
+      .eq('user_id', userId)
+      .order('sort_order');
+    if (error) throw error;
+    if (data && data.length > 0) return data;
+  }
+  return [];
 }

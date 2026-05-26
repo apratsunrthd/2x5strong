@@ -161,6 +161,270 @@
     .set-btn.locked { background: transparent; border-color: var(--border); color: var(--muted2); cursor: not-allowed; opacity: 0.4; }
     .lift-card.lift-locked { border-color: var(--muted2); opacity: 0.75; }
 
+
+    /* ── Accessories ─────────────────────────────────── */
+    .accessories-section {
+      margin-top: 28px;
+      padding-top: 20px;
+      border-top: 1px solid var(--border);
+    }
+    .accessories-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 16px;
+    }
+    .accessories-title {
+      font-family: var(--font-d);
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+    }
+    .accessories-title span {
+      font-size: 13px;
+      font-weight: 400;
+      color: var(--muted);
+      margin-left: 8px;
+      font-family: var(--font-b);
+      letter-spacing: 0;
+    }
+    .add-accessory-btn {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 7px 14px;
+      color: var(--text);
+      font-family: var(--font-d);
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: border-color 0.12s;
+    }
+    .add-accessory-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+    .accessory-list { display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px; }
+
+    .accessory-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px 16px;
+    }
+    .accessory-card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 10px;
+    }
+    .accessory-name {
+      font-family: var(--font-d);
+      font-size: 18px;
+      font-weight: 700;
+    }
+    .accessory-type-badge {
+      font-family: var(--font-d);
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      padding: 2px 8px;
+      border-radius: 4px;
+    }
+    .type-standard { background: var(--surface2); color: var(--muted); }
+    .type-assisted { background: var(--info-bg); color: var(--info); }
+    .type-weighted { background: var(--accent-bg); color: var(--accent-dim); }
+
+    .accessory-remove {
+      background: none;
+      border: none;
+      color: var(--muted2);
+      cursor: pointer;
+      padding: 4px;
+      font-size: 16px;
+      line-height: 1;
+      transition: color 0.12s;
+    }
+    .accessory-remove:hover { color: var(--danger); }
+
+    .accessory-sets { display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px; }
+    .accessory-set-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+    }
+    .accessory-set-num {
+      font-family: var(--font-d);
+      font-weight: 700;
+      color: var(--muted2);
+      min-width: 24px;
+    }
+    .accessory-input {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 5px 8px;
+      color: var(--text);
+      font-size: 13px;
+      font-family: var(--font-b);
+      width: 64px;
+      outline: none;
+      text-align: center;
+    }
+    .accessory-input:focus { border-color: var(--accent); }
+    .accessory-input-label { color: var(--muted); font-size: 12px; min-width: 24px; }
+    .accessory-set-remove {
+      background: none;
+      border: none;
+      color: var(--muted2);
+      cursor: pointer;
+      font-size: 14px;
+      padding: 2px 4px;
+      margin-left: auto;
+    }
+    .accessory-set-remove:hover { color: var(--danger); }
+
+    .add-set-btn {
+      background: none;
+      border: 1px dashed var(--border);
+      border-radius: 6px;
+      padding: 5px 12px;
+      color: var(--muted);
+      font-size: 12px;
+      font-family: var(--font-d);
+      font-weight: 600;
+      letter-spacing: 0.5px;
+      cursor: pointer;
+      transition: border-color 0.12s, color 0.12s;
+      width: 100%;
+      text-align: center;
+    }
+    .add-set-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+    /* Suggestions strip */
+    .suggestions-strip {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-bottom: 12px;
+    }
+    .suggestion-chip {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 4px 12px;
+      font-size: 12px;
+      color: var(--muted);
+      cursor: pointer;
+      transition: border-color 0.12s, color 0.12s;
+      white-space: nowrap;
+    }
+    .suggestion-chip:hover { border-color: var(--accent); color: var(--accent); }
+    .suggestion-chip.suggested { border-color: var(--info); color: var(--info); }
+
+    /* Exercise picker modal */
+    .picker-modal {
+      background: var(--surface);
+      border: 1px solid var(--border2);
+      border-radius: var(--radius-lg);
+      padding: 0;
+      max-width: 440px;
+      width: 100%;
+      max-height: 85vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .picker-header {
+      padding: 20px 20px 0;
+      flex-shrink: 0;
+    }
+    .picker-header h2 {
+      font-size: 22px;
+      margin-bottom: 12px;
+    }
+    .picker-search {
+      width: 100%;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 9px 14px;
+      color: var(--text);
+      font-size: 14px;
+      font-family: var(--font-b);
+      outline: none;
+      margin-bottom: 12px;
+    }
+    .picker-search:focus { border-color: var(--accent); }
+    .picker-categories {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      padding-bottom: 12px;
+    }
+    .cat-btn {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 3px 12px;
+      font-size: 12px;
+      font-family: var(--font-d);
+      font-weight: 600;
+      letter-spacing: 0.3px;
+      color: var(--muted);
+      cursor: pointer;
+      transition: all 0.12s;
+    }
+    .cat-btn.active { background: var(--accent); border-color: var(--accent); color: #000; }
+    .picker-list {
+      overflow-y: auto;
+      flex: 1;
+      padding: 0 20px;
+    }
+    .picker-category-label {
+      font-family: var(--font-d);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: var(--muted2);
+      padding: 10px 0 6px;
+      position: sticky;
+      top: 0;
+      background: var(--surface);
+    }
+    .picker-exercise {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--border);
+      cursor: pointer;
+      transition: color 0.12s;
+    }
+    .picker-exercise:hover .picker-ex-name { color: var(--accent); }
+    .picker-ex-name { font-size: 14px; font-weight: 500; }
+    .picker-ex-type {
+      font-size: 11px;
+      font-family: var(--font-d);
+      font-weight: 600;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+    }
+    .picker-ex-type.type-assisted { color: var(--info); }
+    .picker-ex-type.type-weighted { color: var(--accent-dim); }
+    .picker-ex-type.type-standard { color: var(--muted2); }
+    .picker-footer {
+      padding: 16px 20px;
+      border-top: 1px solid var(--border);
+      flex-shrink: 0;
+      display: flex;
+      gap: 10px;
+    }
+
     /* ── Warmup sets ─────────────────────────────────── */
     .warmup-sets {
       margin-bottom: 12px;
@@ -496,6 +760,20 @@
       </div>
 
       <div class="lifts" id="lifts-container"></div>
+      <!-- Accessory Work -->
+      <div class="accessories-section">
+        <div class="accessories-header">
+          <div class="accessories-title">
+            ACCESSORIES <span>optional</span>
+          </div>
+          <button class="add-accessory-btn" onclick="openExercisePicker()">
+            + ADD
+          </button>
+        </div>
+        <div class="suggestions-strip" id="accessory-suggestions"></div>
+        <div class="accessory-list" id="accessory-list"></div>
+      </div>
+
       <button class="finish-btn" id="finish-btn" onclick="openFinishModal()" disabled>
         FINISH WORKOUT
       </button>
@@ -542,6 +820,56 @@
     <div class="modal-actions">
       <button class="btn btn-ghost" onclick="closeFinishModal()">CANCEL</button>
       <button class="btn btn-primary" onclick="confirmFinish()">SAVE</button>
+    </div>
+  </div>
+</div>
+
+<!-- Exercise Picker Modal -->
+<div class="modal-overlay" id="exercise-picker-modal">
+  <div class="picker-modal">
+    <div class="picker-header">
+      <h2>ADD EXERCISE</h2>
+      <input class="picker-search" id="picker-search" placeholder="Search exercises…" oninput="filterPicker()">
+      <div class="picker-categories" id="picker-categories"></div>
+    </div>
+    <div class="picker-list" id="picker-list"></div>
+    <div class="picker-footer">
+      <button class="btn btn-ghost btn-full" onclick="closeExercisePicker()">CANCEL</button>
+      <button class="btn btn-ghost btn-full" onclick="openAddCustomExercise()">+ CUSTOM</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add Custom Exercise Modal -->
+<div class="modal-overlay" id="custom-exercise-modal">
+  <div class="modal-box">
+    <h2>CUSTOM EXERCISE</h2>
+    <div class="form-group">
+      <label class="form-label">Name</label>
+      <input class="form-input" id="custom-ex-name" placeholder="e.g. Nordic Curls" maxlength="50">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Category</label>
+      <select class="form-input" id="custom-ex-category">
+        <option value="Core">Core</option>
+        <option value="Pull">Pull</option>
+        <option value="Push">Push</option>
+        <option value="Legs">Legs</option>
+        <option value="Arms">Arms</option>
+        <option value="Other">Other</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Type</label>
+      <select class="form-input" id="custom-ex-type">
+        <option value="standard">Standard (weight or bodyweight)</option>
+        <option value="assisted">Assisted (e.g. band-assisted pull-ups)</option>
+        <option value="weighted">Weighted bodyweight (e.g. weighted dips)</option>
+      </select>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeCustomExercise()">CANCEL</button>
+      <button class="btn btn-primary" onclick="saveCustomExercise()">ADD</button>
     </div>
   </div>
 </div>

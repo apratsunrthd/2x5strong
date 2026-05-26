@@ -16,7 +16,7 @@ const WORKOUT_A = [
 const WORKOUT_B = [
   { id: 'squat',    name: 'Squat',           increment: 5,   reps: 5 },
   { id: 'press',    name: 'Overhead Press',  increment: 2.5, reps: 5 },
-  { id: 'deadlift', name: 'Deadlift',        increment: 5,   reps: 5 },
+  { id: 'deadlift', name: 'Deadlift',        increment: 10,  reps: 5 },
 ];
 
 // ── App State ─────────────────────────────────────────────────
@@ -32,7 +32,7 @@ let timerInterval = null;
 let sessionStartTime = null;
 let lastSetTime = null;
 
-function startTimer() {
+window.startTimer = function() {
   if (timerInterval) return; // already running
   sessionStartTime = sessionStartTime || Date.now();
   timerInterval = setInterval(updateTimerDisplay, 1000);
@@ -141,6 +141,7 @@ async function init() {
 
   renderNav();
   initSession();
+  loadAccessoryData();
   showTab('workout');
   document.getElementById('app-loading').style.display = 'none';
   document.getElementById('app-content').style.display = 'block';
@@ -243,6 +244,19 @@ function isLight(hex) {
   return (r*299 + g*587 + b*114) / 1000 > 128;
 }
 
+// ── Deadlift progression rules ───────────────────────────────
+// Under 225lb: 5×5, +10lb per session
+// 225lb and over: 1×5, +5lb per session
+const DEADLIFT_HEAVY_THRESHOLD = 225;
+
+function deadliftSetsCount(weight) {
+  return weight >= DEADLIFT_HEAVY_THRESHOLD ? 1 : 5;
+}
+
+function deadliftIncrement(weight) {
+  return weight >= DEADLIFT_HEAVY_THRESHOLD ? 5 : 10;
+}
+
 // ── Warmup set generator ──────────────────────────────────────
 // Returns array of { weight, reps } for warmup sets.
 // Skips any step within MIN_GAP lb of bar, working weight, or each other.
@@ -281,6 +295,9 @@ function initSession() {
   const day = profile.next_workout || 'A';
   const lifts = day === 'A' ? WORKOUT_A : WORKOUT_B;
 
+  accessoryItems = [];
+  renderAccessories();
+
   currentSession = {
     day,
     liftResults: lifts.map(lift => ({
@@ -289,9 +306,13 @@ function initSession() {
       increment: lift.increment,
       weight: liftStates[lift.id]?.weight ?? 45,
       barWeight: liftStates[lift.id]?.bar_weight ?? 45,
-      increment: effectiveIncrement(lift.increment, getGlobalSettings().minIncrement),
+      increment: effectiveIncrement(
+        lift.id === 'deadlift' ? deadliftIncrement(liftStates[lift.id]?.weight ?? 45) : lift.increment,
+        getGlobalSettings().minIncrement
+      ),
       // null = unrecorded, 0–5 = reps completed
-      sets: [null, null, null, null, null],
+      // deadlift uses 1 set above threshold, 5 sets below
+      sets: Array(lift.id === 'deadlift' ? deadliftSetsCount(liftStates[lift.id]?.weight ?? 45) : 5).fill(null),
       // locked = true when 3 consecutive failed sets end this lift early
       locked: false,
       // warmups generated once at session start, toggled done/undone
@@ -357,7 +378,8 @@ function renderWorkout() {
     const isDeload = (state.deloads || 0) > 0;
 
     const recordedSets = lr.sets.filter(s => s !== null && s !== 'locked');
-    const allFive     = recordedSets.length === 5 && recordedSets.every(v => v === 5);
+    const totalSets   = lr.sets.length;
+    const allFive     = recordedSets.length === totalSets && recordedSets.every(v => v === 5);
     const anyFail     = recordedSets.some(v => setFailed(v));
     const isPR        = allFive && (personalRecords[lr.liftId] ?? 0) > 0 && lr.weight > (personalRecords[lr.liftId] ?? 0);
 
@@ -413,7 +435,7 @@ function renderWorkout() {
 
     // Summary: total reps out of 25
     const totalReps = recordedSets.reduce((a, v) => a + v, 0);
-    const maxReps = recordedSets.length * 5;
+    const maxReps = totalSets * 5;
     const summaryLabel = recordedSets.length === 0
       ? 'tap to record'
       : lr.locked
@@ -423,6 +445,8 @@ function renderWorkout() {
     let warningLine = '';
     if (lr.locked) {
       warningLine = `<div class="lift-warn">3 consecutive failures — lift ended for today</div>`;
+    } else if (lr.liftId === 'deadlift' && lr.weight >= DEADLIFT_HEAVY_THRESHOLD) {
+      warningLine = `<div class="lift-warn deload-note">Heavy deadlift — 1 work set, +5 lb progression</div>`;
     } else if (failures >= 2 && !isDeload) {
       warningLine = `<div class="lift-warn">Next session failure triggers deload</div>`;
     } else if (isDeload) {
@@ -438,7 +462,7 @@ function renderWorkout() {
           </div>
           <div class="lift-weight-block">
             <div class="lift-weight">${lr.weight}<span>lb</span></div>
-            <div class="lift-prescription">5 × 5</div>
+            <div class="lift-prescription">${totalSets} × 5</div>
           </div>
         </div>
         ${warmupsHtml}
@@ -491,9 +515,10 @@ window.openFinishModal = function() {
     lr.sets.some(s => s !== null && s !== 'locked' && setFailed(s))
   );
   const lockedLifts = currentSession.liftResults.filter(lr => lr.locked);
-  const allPerfect  = currentSession.liftResults.every(lr =>
-    lr.sets.every(s => s === 5)
-  );
+  const allPerfect  = currentSession.liftResults.every(lr => {
+    const recorded = lr.sets.filter(s => s !== null && s !== 'locked');
+    return recorded.length === lr.sets.length && recorded.every(v => v === 5);
+  });
 
   let title = allPerfect ? '💪 PERFECT SESSION' : 'SAVE SESSION?';
   let body  = '';
@@ -534,16 +559,25 @@ window.confirmFinish = async function() {
       sets: lr.sets,
     }));
 
-    await saveSession(user.id, currentSession.day, liftResultsForDb);
+    const savedSession = await saveSession(user.id, currentSession.day, liftResultsForDb);
+
+    // Save accessory logs if any were recorded
+    const filledAccessories = accessoryItems.filter(a =>
+      a.sets.some(s => s.reps !== '' && s.reps !== undefined)
+    );
+    if (filledAccessories.length > 0 && savedSession) {
+      const { saveAccessoryLogs } = await import('./db.js');
+      await saveAccessoryLogs(savedSession.id, user.id, filledAccessories);
+    }
 
     // Update lift states
     const updates = [];
     for (const lr of currentSession.liftResults) {
       const state = liftStates[lr.liftId] || { failures: 0, deloads: 0, weight: lr.weight };
 
-      // A lift passes only if all 5 sets were completed at 5 reps
+      // A lift passes only if all sets were completed at 5 reps
       const recordedSets = lr.sets.filter(s => s !== null && s !== 'locked');
-      const allFive = recordedSets.length === 5 && recordedSets.every(v => v === 5);
+      const allFive = recordedSets.length === lr.sets.length && recordedSets.every(v => v === 5);
 
       let newWeight   = state.weight;
       let newFailures = state.failures;
@@ -615,7 +649,7 @@ async function renderHistory() {
   container.innerHTML = '<div class="loading-msg">Loading history…</div>';
 
   try {
-    const { getSessions } = await import('./db.js');
+    const { getSessions, getCustomExercises } = await import('./db.js');
     const sessions = await getSessions(user.id, 100);
 
     const totalWorkouts = sessions.length;
@@ -682,7 +716,8 @@ async function renderHistory() {
         const totalVolume = workVolume + warmupVolume;
         const volumeStr = totalVolume > 0 ? ` · ${Math.round(totalVolume).toLocaleString()}lb` : '';
 
-        return `<span class="${cls}">${l.lift_name} ${l.weight}lb ${l.sets_passed}/5${volumeStr}</span>`;
+        const expectedSets = l.lift_id === 'deadlift' && l.weight >= 225 ? 1 : 5;
+        return `<span class="${cls}">${l.lift_name} ${l.weight}lb ${l.sets_passed}/${expectedSets}${volumeStr}</span>`;
       }).join('');
 
       // Session total volume
@@ -694,6 +729,22 @@ async function renderHistory() {
         return acc + workVol + warmupVol;
       }, 0);
 
+      // Accessories summary
+      const accessories = (s.accessory_logs || [])
+        .sort((a,b) => a.sort_order - b.sort_order);
+      const accessoriesHtml = accessories.length === 0 ? '' :
+        '<div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px;">'
+        + accessories.map(a => {
+            const sets = (a.sets_json || []).filter(s => s.reps);
+            if (sets.length === 0) return '';
+            const summary = sets.map(s => {
+              if (a.exercise_type === 'assisted') return `${s.reps}r${s.assistance ? ' -'+s.assistance+'lb' : ''}`;
+              return `${s.reps}r${s.weight ? ' @'+s.weight+'lb' : ''}`;
+            }).join(', ');
+            return `<span class="h-lift" style="color:var(--muted);">${a.exercise_name}: ${summary}</span>`;
+          }).filter(Boolean).join('')
+        + '</div>';
+
       list.insertAdjacentHTML('beforeend', `
         <div class="history-item card card-sm">
           <div class="history-meta">
@@ -704,6 +755,7 @@ async function renderHistory() {
             </div>
           </div>
           <div class="history-lifts">${liftsHtml}</div>
+          ${accessoriesHtml}
         </div>
       `);
     });
@@ -717,7 +769,286 @@ async function renderHistory() {
 
 const LIFT_NAMES = { squat:'Squat', bench:'Bench Press', row:'Barbell Row', press:'Overhead Press', deadlift:'Deadlift' };
 
-// Builds the per-lift increment rows for the settings panel
+// ── Built-in exercise library ─────────────────────────────────
+const BUILTIN_EXERCISES = [
+  // Core
+  { name: 'Hanging Leg Raises',     category: 'Core', type: 'standard' },
+  { name: 'Ab Wheel Rollouts',      category: 'Core', type: 'standard' },
+  { name: 'Cable Crunches',         category: 'Core', type: 'standard' },
+  { name: 'Plank',                  category: 'Core', type: 'standard' },
+  { name: 'Pallof Press',           category: 'Core', type: 'standard' },
+  { name: 'Dead Bug',               category: 'Core', type: 'standard' },
+  // Pull
+  { name: 'Pull-Ups',               category: 'Pull', type: 'assisted' },
+  { name: 'Chin-Ups',               category: 'Pull', type: 'assisted' },
+  { name: 'Dips',                   category: 'Push', type: 'assisted' },
+  { name: 'Face Pulls',             category: 'Pull', type: 'standard' },
+  { name: 'Band Pull-Aparts',       category: 'Pull', type: 'standard' },
+  { name: 'Cable Rows',             category: 'Pull', type: 'standard' },
+  { name: 'Lat Pulldowns',          category: 'Pull', type: 'standard' },
+  // Push
+  { name: 'Push-Ups',               category: 'Push', type: 'standard' },
+  { name: 'Cable Flyes',            category: 'Push', type: 'standard' },
+  { name: 'DB Shoulder Press',      category: 'Push', type: 'standard' },
+  { name: 'Lateral Raises',         category: 'Push', type: 'standard' },
+  { name: 'Front Raises',           category: 'Push', type: 'standard' },
+  // Legs
+  { name: 'Lunges',                 category: 'Legs', type: 'standard' },
+  { name: 'Box Step-Ups',           category: 'Legs', type: 'standard' },
+  { name: 'Box Jumps',              category: 'Legs', type: 'standard' },
+  { name: 'Bulgarian Split Squats', category: 'Legs', type: 'standard' },
+  { name: 'Leg Press',              category: 'Legs', type: 'standard' },
+  { name: 'Leg Curls',              category: 'Legs', type: 'standard' },
+  { name: 'Calf Raises',            category: 'Legs', type: 'standard' },
+  // Arms
+  { name: 'Barbell Curls',          category: 'Arms', type: 'standard' },
+  { name: 'Hammer Curls',           category: 'Arms', type: 'standard' },
+  { name: 'Incline DB Curls',       category: 'Arms', type: 'standard' },
+  { name: 'Tricep Pushdowns',       category: 'Arms', type: 'standard' },
+  { name: 'Skull Crushers',         category: 'Arms', type: 'standard' },
+  { name: 'DB Lateral Raises',      category: 'Arms', type: 'standard' },
+];
+
+const ACCESSORY_CATEGORIES = ['All', 'Core', 'Pull', 'Push', 'Legs', 'Arms', 'Other'];
+
+// ── Accessory session state ───────────────────────────────────
+let accessoryItems  = [];   // current session accessories
+let customExercises = [];   // user's custom exercises from DB
+let lastAccessories = [];   // from previous session for suggestions
+let pickerCategory  = 'All';
+
+// ── Load accessories data ─────────────────────────────────────
+async function loadAccessoryData() {
+  try {
+    const { getCustomExercises, getLastAccessoryLogs } = await import('./db.js');
+    const [custom, last] = await Promise.all([
+      getCustomExercises(user.id),
+      getLastAccessoryLogs(user.id),
+    ]);
+    customExercises = custom;
+    lastAccessories = last;
+    renderSuggestions();
+  } catch(e) {
+    console.warn('Failed to load accessory data:', e);
+  }
+}
+
+// ── Suggestions ───────────────────────────────────────────────
+function renderSuggestions() {
+  const strip = document.getElementById('accessory-suggestions');
+  if (!strip) return;
+
+  // Group last accessories by name, take unique ones
+  const seen = new Set();
+  const suggestions = lastAccessories
+    .filter(a => { if (seen.has(a.exercise_name)) return false; seen.add(a.exercise_name); return true; })
+    .slice(0, 6);
+
+  if (suggestions.length === 0) { strip.innerHTML = ''; return; }
+
+  strip.innerHTML = '<div style="font-size:11px;color:var(--muted2);font-family:var(--font-d);font-weight:700;letter-spacing:0.8px;text-transform:uppercase;width:100%;margin-bottom:2px;">From last session</div>'
+    + suggestions.map(s => {
+      const alreadyAdded = accessoryItems.some(a => a.name === s.exercise_name);
+      if (alreadyAdded) return '';
+      // Suggest with last session's sets as starting point
+      return `<button class="suggestion-chip suggested" onclick="addSuggestedAccessory('${s.exercise_name.replace(/'/g,"\'")}', '${s.exercise_type}', '${s.category}')">${s.exercise_name}</button>`;
+    }).filter(Boolean).join('');
+}
+
+// ── Accessory rendering ───────────────────────────────────────
+function renderAccessories() {
+  const list = document.getElementById('accessory-list');
+  if (!list) return;
+
+  if (accessoryItems.length === 0) {
+    list.innerHTML = '';
+    return;
+  }
+
+  list.innerHTML = accessoryItems.map((item, idx) => {
+    const typeBadgeClass = item.type === 'assisted' ? 'type-assisted' : item.type === 'weighted' ? 'type-weighted' : 'type-standard';
+    const typeBadgeLabel = item.type === 'assisted' ? 'ASSISTED' : item.type === 'weighted' ? 'WEIGHTED' : '';
+
+    const setsHtml = item.sets.map((s, si) => {
+      let inputs = '';
+      if (item.type === 'assisted') {
+        inputs = `
+          <input class="accessory-input" type="number" min="0" placeholder="reps"
+            value="${s.reps || ''}" oninput="updateAccessorySet(${idx},${si},'reps',this.value)">
+          <span class="accessory-input-label">reps</span>
+          <input class="accessory-input" type="number" min="0" placeholder="band"
+            value="${s.assistance || ''}" oninput="updateAccessorySet(${idx},${si},'assistance',this.value)"
+            style="border-color:var(--info);">
+          <span class="accessory-input-label" style="color:var(--info);">lb assist</span>`;
+      } else {
+        inputs = `
+          <input class="accessory-input" type="number" min="0" placeholder="reps"
+            value="${s.reps || ''}" oninput="updateAccessorySet(${idx},${si},'reps',this.value)">
+          <span class="accessory-input-label">reps</span>
+          <input class="accessory-input" type="number" min="0" placeholder="lb"
+            value="${s.weight || ''}" oninput="updateAccessorySet(${idx},${si},'weight',this.value)">
+          <span class="accessory-input-label">lb</span>`;
+      }
+      return `<div class="accessory-set-row">
+        <span class="accessory-set-num">${si+1}</span>
+        ${inputs}
+        <button class="accessory-set-remove" onclick="removeAccessorySet(${idx},${si})">✕</button>
+      </div>`;
+    }).join('');
+
+    return `<div class="accessory-card">
+      <div class="accessory-card-header">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span class="accessory-name">${item.name}</span>
+          ${typeBadgeLabel ? `<span class="accessory-type-badge ${typeBadgeClass}">${typeBadgeLabel}</span>` : ''}
+        </div>
+        <button class="accessory-remove" onclick="removeAccessory(${idx})" title="Remove">✕</button>
+      </div>
+      <div class="accessory-sets">${setsHtml}</div>
+      <button class="add-set-btn" onclick="addAccessorySet(${idx})">+ ADD SET</button>
+    </div>`;
+  }).join('');
+
+  renderSuggestions();
+}
+
+// ── Accessory actions ─────────────────────────────────────────
+window.addSuggestedAccessory = function(name, type, category) {
+  // Pre-populate with last session's data nudged slightly
+  const lastEntry = lastAccessories.find(a => a.exercise_name === name);
+  let sets = [{ reps: '', weight: '', assistance: '' }];
+  if (lastEntry && lastEntry.sets_json && lastEntry.sets_json.length > 0) {
+    sets = lastEntry.sets_json.map(s => ({ ...s }));
+  }
+  accessoryItems.push({ name, type: type || 'standard', category: category || 'Other', sets });
+  renderAccessories();
+};
+
+function addAccessoryFromPicker(name, type, category) {
+  accessoryItems.push({ name, type, category, sets: [{ reps: '', weight: '', assistance: '' }] });
+  renderAccessories();
+  closeExercisePicker();
+}
+
+window.removeAccessory = function(idx) {
+  accessoryItems.splice(idx, 1);
+  renderAccessories();
+};
+
+window.addAccessorySet = function(idx) {
+  accessoryItems[idx].sets.push({ reps: '', weight: '', assistance: '' });
+  renderAccessories();
+};
+
+window.removeAccessorySet = function(idx, si) {
+  accessoryItems[idx].sets.splice(si, 1);
+  if (accessoryItems[idx].sets.length === 0) {
+    accessoryItems[idx].sets.push({ reps: '', weight: '', assistance: '' });
+  }
+  renderAccessories();
+};
+
+window.updateAccessorySet = function(idx, si, field, value) {
+  accessoryItems[idx].sets[si][field] = value === '' ? '' : parseFloat(value) || 0;
+};
+
+// ── Exercise picker ───────────────────────────────────────────
+window.openExercisePicker = function() {
+  pickerCategory = 'All';
+  document.getElementById('picker-search').value = '';
+  renderPickerCategories();
+  renderPickerList();
+  document.getElementById('exercise-picker-modal').classList.add('open');
+};
+
+window.closeExercisePicker = function() {
+  document.getElementById('exercise-picker-modal').classList.remove('open');
+};
+
+function renderPickerCategories() {
+  const el = document.getElementById('picker-categories');
+  el.innerHTML = ACCESSORY_CATEGORIES.map(c =>
+    `<button class="cat-btn ${c === pickerCategory ? 'active' : ''}" onclick="setPickerCategory('${c}')">${c}</button>`
+  ).join('');
+}
+
+window.setPickerCategory = function(cat) {
+  pickerCategory = cat;
+  renderPickerCategories();
+  renderPickerList();
+};
+
+window.filterPicker = function() { renderPickerList(); };
+
+function renderPickerList() {
+  const search = document.getElementById('picker-search').value.toLowerCase();
+  const all = [
+    ...BUILTIN_EXERCISES,
+    ...customExercises.map(e => ({ name: e.name, category: e.category, type: e.exercise_type, custom: true, id: e.id }))
+  ];
+
+  const filtered = all.filter(e => {
+    const matchCat = pickerCategory === 'All' || e.category === pickerCategory;
+    const matchSearch = !search || e.name.toLowerCase().includes(search);
+    const notAdded = !accessoryItems.some(a => a.name === e.name);
+    return matchCat && matchSearch && notAdded;
+  });
+
+  // Group by category
+  const grouped = {};
+  filtered.forEach(e => {
+    if (!grouped[e.category]) grouped[e.category] = [];
+    grouped[e.category].push(e);
+  });
+
+  const el = document.getElementById('picker-list');
+  if (filtered.length === 0) {
+    el.innerHTML = '<div style="padding:24px;text-align:center;color:var(--muted);font-size:14px;">No exercises found</div>';
+    return;
+  }
+
+  el.innerHTML = Object.entries(grouped).map(([cat, exercises]) => `
+    <div class="picker-category-label">${cat}</div>
+    ${exercises.map(e => `
+      <div class="picker-exercise" onclick="addAccessoryFromPicker('${e.name.replace(/'/g,"\'")}','${e.type}','${e.category}')">
+        <span class="picker-ex-name">${e.name}${e.custom ? ' <span style="color:var(--muted2);font-size:11px;">(custom)</span>' : ''}</span>
+        <span class="picker-ex-type type-${e.type}">${e.type === 'standard' ? '' : e.type === 'assisted' ? 'ASSISTED' : 'WEIGHTED'}</span>
+      </div>
+    `).join('')}
+  `).join('');
+}
+
+// ── Custom exercise modal ─────────────────────────────────────
+window.openAddCustomExercise = function() {
+  document.getElementById('exercise-picker-modal').classList.remove('open');
+  document.getElementById('custom-ex-name').value = '';
+  document.getElementById('custom-exercise-modal').classList.add('open');
+};
+
+window.closeCustomExercise = function() {
+  document.getElementById('custom-exercise-modal').classList.remove('open');
+  document.getElementById('exercise-picker-modal').classList.add('open');
+};
+
+window.saveCustomExercise = async function() {
+  const name = document.getElementById('custom-ex-name').value.trim();
+  const category = document.getElementById('custom-ex-category').value;
+  const exercise_type = document.getElementById('custom-ex-type').value;
+  if (!name) { toast('Enter an exercise name', 'error'); return; }
+
+  try {
+    const { addCustomExercise } = await import('./db.js');
+    const newEx = await addCustomExercise(user.id, { name, category, exercise_type });
+    customExercises.push(newEx);
+    closeCustomExercise();
+    toast(`${name} added`, 'success');
+    renderPickerList();
+  } catch(e) {
+    toast('Failed to save exercise', 'error');
+  }
+};
+
+// ── Builds the per-lift increment rows for the settings panel
 function buildIncrementRows() {
   const settings = getGlobalSettings();
   const allLifts = [...WORKOUT_A, ...WORKOUT_B].filter((l, i, a) => a.findIndex(x => x.id === l.id) === i);
