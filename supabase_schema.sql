@@ -120,3 +120,46 @@ create or replace trigger on_auth_user_created
 -- lift_ids: squat, bench, row, press, deadlift
 -- all start at 45lb
 -- ============================================================
+
+-- ============================================================
+-- ACCESSORY EXERCISES (user's custom exercise library)
+-- Built-in exercises live in JS; this table stores user-added ones
+-- ============================================================
+create table if not exists accessory_exercises (
+  id uuid default uuid_generate_v4() primary key,
+  user_id uuid references profiles(id) on delete cascade not null,
+  name text not null,
+  category text not null default 'Other',
+  exercise_type text not null default 'standard', -- standard | assisted | weighted_bodyweight
+  created_at timestamptz default now()
+);
+
+alter table accessory_exercises enable row level security;
+
+create policy "Users can manage own accessory exercises"
+  on accessory_exercises for all using (auth.uid() = user_id);
+
+-- ============================================================
+-- ACCESSORY LOGS (accessories done in a session)
+-- ============================================================
+create table if not exists accessory_logs (
+  id uuid default uuid_generate_v4() primary key,
+  session_id uuid references sessions(id) on delete cascade not null,
+  user_id uuid references profiles(id) on delete cascade not null,
+  exercise_name text not null,
+  exercise_type text not null default 'standard',
+  category text not null default 'Other',
+  sets_json jsonb not null default '[]', -- [{reps, weight, assistance}]
+  sort_order int not null default 0,
+  created_at timestamptz default now()
+);
+
+alter table accessory_logs enable row level security;
+
+create policy "Users can manage own accessory logs"
+  on accessory_logs for all using (auth.uid() = user_id);
+
+-- ── v0.6 migration: run these if you already have a database ──
+-- create table if not exists accessory_exercises (...) -- see above
+-- create table if not exists accessory_logs (...) -- see above
+-- Or just run the full create statements above, they use IF NOT EXISTS
