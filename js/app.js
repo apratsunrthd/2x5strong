@@ -96,6 +96,42 @@ function saveGlobalSettings(settings) {
 }
 
 // Round weight to nearest minIncrement (0.5 rounds up)
+// ── Session persistence (survives page reload) ───────────────
+const SESSION_DRAFT_KEY = '2x5strong_draft';
+
+function saveDraftSession() {
+  if (!user || !currentSession) return;
+  try {
+    localStorage.setItem(SESSION_DRAFT_KEY + '_' + user.id, JSON.stringify({
+      session: currentSession,
+      accessories: accessoryItems,
+      timerStart: sessionStartTime,
+      timerLast: lastSetTime,
+      savedAt: Date.now(),
+    }));
+  } catch(e) { console.warn('Draft save failed:', e); }
+}
+
+function loadDraftSession() {
+  if (!user) return null;
+  try {
+    const raw = localStorage.getItem(SESSION_DRAFT_KEY + '_' + user.id);
+    if (!raw) return null;
+    const draft = JSON.parse(raw);
+    // Discard drafts older than 24 hours
+    if (Date.now() - draft.savedAt > 24 * 60 * 60 * 1000) {
+      clearDraftSession();
+      return null;
+    }
+    return draft;
+  } catch(e) { return null; }
+}
+
+function clearDraftSession() {
+  if (!user) return;
+  localStorage.removeItem(SESSION_DRAFT_KEY + '_' + user.id);
+}
+
 function roundToIncrement(weight, minIncrement) {
   return Math.round(weight / minIncrement) * minIncrement;
 }
@@ -140,8 +176,26 @@ async function init() {
   }
 
   renderNav();
-  initSession();
   loadAccessoryData();
+
+  // Restore draft session if one exists, otherwise start fresh
+  const draft = loadDraftSession();
+  if (draft && draft.session && draft.session.day) {
+    currentSession = draft.session;
+    accessoryItems = draft.accessories || [];
+    // Restore timer state
+    if (draft.timerStart) {
+      sessionStartTime = draft.timerStart;
+      lastSetTime = draft.timerLast;
+      startTimer();
+    }
+    renderWorkout();
+    renderAccessories();
+    toast('Session restored', 'success');
+  } else {
+    initSession();
+  }
+
   showTab('workout');
   document.getElementById('app-loading').style.display = 'none';
   document.getElementById('app-content').style.display = 'block';
@@ -365,7 +419,7 @@ function applyLockout(lr) {
 
 // ── Workout render ────────────────────────────────────────────
 
-function renderWorkout() {
+window.renderWorkout = function() {
   const day = currentSession.day;
   document.getElementById('workout-day').textContent = `WORKOUT ${day}`;
 
@@ -460,9 +514,9 @@ function renderWorkout() {
             <div class="lift-name">${lr.name}${badge}</div>
             ${warningLine}
           </div>
-          <div class="lift-weight-block">
+          <div class="lift-weight-block" onclick="editLiftWeight(${idx})" title="Tap to edit weight" style="cursor:pointer;">
             <div class="lift-weight">${lr.weight}<span>lb</span></div>
-            <div class="lift-prescription">${totalSets} × 5</div>
+            <div class="lift-prescription">${totalSets} × 5 <span style="font-size:10px;color:var(--muted2);">✎</span></div>
           </div>
         </div>
         ${warmupsHtml}
@@ -499,13 +553,36 @@ window.cycleSet = function(liftIdx, setIdx) {
   }
 
   applyLockout(lr);
+  saveDraftSession();
   renderWorkout();
 };
 
 window.toggleWarmup = function(liftIdx, warmupIdx) {
   const lr = currentSession.liftResults[liftIdx];
   lr.warmups[warmupIdx].done = !lr.warmups[warmupIdx].done;
+  saveDraftSession();
   renderWorkout();
+};
+
+window.editLiftWeight = async function(liftIdx) {
+  const lr = currentSession.liftResults[liftIdx];
+  const val = parseFloat(prompt(`Weight for ${lr.name} (lb):`, lr.weight));
+  if (isNaN(val) || val <= 0) return;
+
+  const settings = getGlobalSettings();
+  const rounded = roundToIncrement(val, settings.minIncrement);
+
+  // Update current session
+  lr.weight = rounded;
+  lr.warmups = generateWarmups(rounded, lr.barWeight).map(w => ({ ...w, done: false }));
+
+  // Save to profile
+  await upsertLiftState(user.id, lr.liftId, { weight: rounded, failures: 0 });
+  liftStates[lr.liftId] = { ...liftStates[lr.liftId], weight: rounded, failures: 0 };
+
+  saveDraftSession();
+  renderWorkout();
+  toast(`${lr.name} updated to ${rounded} lb`, 'success');
 };
 
 // ── Finish workout ────────────────────────────────────────────
@@ -618,6 +695,7 @@ window.confirmFinish = async function() {
     await Promise.all(updates);
     personalRecords = await getPersonalRecords(user.id);
 
+    clearDraftSession();
     toast('Session saved!', 'success');
     resetTimer();
     initSession();
@@ -644,7 +722,7 @@ window.showTab = function(name) {
 
 // ── History ───────────────────────────────────────────────────
 
-async function renderHistory() {
+async window.renderHistory = function() {
   const container = document.getElementById('history-container');
   container.innerHTML = '<div class="loading-msg">Loading history…</div>';
 
@@ -834,7 +912,7 @@ async function loadAccessoryData() {
 }
 
 // ── Suggestions ───────────────────────────────────────────────
-function renderSuggestions() {
+window.renderSuggestions = function() {
   const strip = document.getElementById('accessory-suggestions');
   if (!strip) return;
 
@@ -856,7 +934,7 @@ function renderSuggestions() {
 }
 
 // ── Accessory rendering ───────────────────────────────────────
-function renderAccessories() {
+window.renderAccessories = function() {
   const list = document.getElementById('accessory-list');
   if (!list) return;
 
@@ -924,7 +1002,7 @@ window.addSuggestedAccessory = function(name, type, category) {
   renderAccessories();
 };
 
-function addAccessoryFromPicker(name, type, category) {
+window.addAccessoryFromPicker = function(name, type, category) {
   accessoryItems.push({ name, type, category, sets: [{ reps: '', weight: '', assistance: '' }] });
   renderAccessories();
   closeExercisePicker();
@@ -932,11 +1010,13 @@ function addAccessoryFromPicker(name, type, category) {
 
 window.removeAccessory = function(idx) {
   accessoryItems.splice(idx, 1);
+  saveDraftSession();
   renderAccessories();
 };
 
 window.addAccessorySet = function(idx) {
   accessoryItems[idx].sets.push({ reps: '', weight: '', assistance: '' });
+  saveDraftSession();
   renderAccessories();
 };
 
@@ -945,11 +1025,13 @@ window.removeAccessorySet = function(idx, si) {
   if (accessoryItems[idx].sets.length === 0) {
     accessoryItems[idx].sets.push({ reps: '', weight: '', assistance: '' });
   }
+  saveDraftSession();
   renderAccessories();
 };
 
 window.updateAccessorySet = function(idx, si, field, value) {
   accessoryItems[idx].sets[si][field] = value === '' ? '' : parseFloat(value) || 0;
+  saveDraftSession(); // lightweight localStorage write, fine on keystroke
 };
 
 // ── Exercise picker ───────────────────────────────────────────
@@ -965,7 +1047,7 @@ window.closeExercisePicker = function() {
   document.getElementById('exercise-picker-modal').classList.remove('open');
 };
 
-function renderPickerCategories() {
+window.renderPickerCategories = function() {
   const el = document.getElementById('picker-categories');
   el.innerHTML = ACCESSORY_CATEGORIES.map(c =>
     `<button class="cat-btn ${c === pickerCategory ? 'active' : ''}" onclick="setPickerCategory('${c}')">${c}</button>`
@@ -980,7 +1062,7 @@ window.setPickerCategory = function(cat) {
 
 window.filterPicker = function() { renderPickerList(); };
 
-function renderPickerList() {
+window.renderPickerList = function() {
   const search = document.getElementById('picker-search').value.toLowerCase();
   const all = [
     ...BUILTIN_EXERCISES,
@@ -1049,7 +1131,7 @@ window.saveCustomExercise = async function() {
 };
 
 // ── Builds the per-lift increment rows for the settings panel
-function buildIncrementRows() {
+window.buildIncrementRows = function() {
   const settings = getGlobalSettings();
   const allLifts = [...WORKOUT_A, ...WORKOUT_B].filter((l, i, a) => a.findIndex(x => x.id === l.id) === i);
   return allLifts.map(l => {
@@ -1064,7 +1146,7 @@ function buildIncrementRows() {
   }).join('');
 }
 
-function renderSettings() {
+window.renderSettings = function() {
   const container = document.getElementById('settings-container');
 
   const weightsHtml = Object.entries(LIFT_NAMES).map(([id, name]) => {
