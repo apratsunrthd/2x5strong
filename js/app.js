@@ -722,7 +722,7 @@ window.showTab = function(name) {
 
 // ── History ───────────────────────────────────────────────────
 
-async window.renderHistory = function() {
+window.renderHistory = async function() {
   const container = document.getElementById('history-container');
   container.innerHTML = '<div class="loading-msg">Loading history…</div>';
 
