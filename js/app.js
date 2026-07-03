@@ -529,11 +529,12 @@ window.renderWorkout = function() {
     `);
   });
 
-  // Enable finish button once at least one set is recorded on any lift
-  const anyStarted = currentSession.liftResults.some(lr =>
-    lr.sets.some(s => s !== null)
+  // Enable finish button as soon as anything has been done
+  const anyWorkDone = currentSession.liftResults.some(lr =>
+    lr.sets.some(s => s !== null) || lr.warmups.some(w => w.done)
   );
-  document.getElementById('finish-btn').disabled = !anyStarted;
+  const timerStarted = sessionStartTime !== null;
+  document.getElementById('finish-btn').disabled = !(anyWorkDone || timerStarted);
 }
 
 // Expose to HTML onclick
@@ -650,6 +651,9 @@ window.confirmFinish = async function() {
     // Update lift states
     const updates = [];
     for (const lr of currentSession.liftResults) {
+      // Skip progression for movement day exercises
+      if (currentSession.isMovementDay || lr.movementDay) continue;
+
       const state = liftStates[lr.liftId] || { failures: 0, deloads: 0, weight: lr.weight };
 
       // A lift passes only if all sets were completed at 5 reps
@@ -684,13 +688,16 @@ window.confirmFinish = async function() {
       liftStates[lr.liftId] = { ...state, weight: newWeight, failures: newFailures, deloads: newDeloads };
     }
 
-    const nextDay = currentSession.day === 'A' ? 'B' : 'A';
-    updates.push(
-      import('./db.js').then(({ updateProfile }) =>
-        updateProfile(user.id, { next_workout: nextDay })
-      )
-    );
-    profile.next_workout = nextDay;
+    // Movement days don't advance the A/B alternation or affect progression
+    if (!currentSession.isMovementDay) {
+      const nextDay = currentSession.day === 'A' ? 'B' : 'A';
+      updates.push(
+        import('./db.js').then(({ updateProfile }) =>
+          updateProfile(user.id, { next_workout: nextDay })
+        )
+      );
+      profile.next_workout = nextDay;
+    }
 
     await Promise.all(updates);
     personalRecords = await getPersonalRecords(user.id);
@@ -1291,6 +1298,172 @@ window.editMinIncrement = function() {
 window.handleSignOut = async function() {
   if (!confirm('Sign out?')) return;
   await signOut();
+};
+
+// ── Movement Day ─────────────────────────────────────────────
+
+const SUPABASE_FUNCTIONS_URL = 'https://aqbrhcdaarpcymhgshuh.supabase.co/functions/v1';
+
+let movementDayWorkout = null; // holds the AI-generated workout
+
+window.openMovementDay = async function() {
+  movementDayWorkout = null;
+  document.getElementById('movement-modal-title').textContent = 'MOVEMENT DAY';
+  document.getElementById('movement-tagline').textContent = '';
+  document.getElementById('movement-do-it-btn').style.display = 'none';
+  document.getElementById('movement-modal-body').innerHTML = `
+    <div class="movement-loading">
+      <span class="spinner" style="width:28px;height:28px;border-width:3px;color:var(--accent);"></span>
+      <p>Generating your workout…</p>
+    </div>`;
+  document.getElementById('movement-modal').classList.add('open');
+
+  try {
+    const settings = getGlobalSettings();
+
+    // Build recent sessions summary for context
+    const { getSessions } = await import('./db.js');
+    const recent = await getSessions(user.id, 3);
+    const recentSummary = recent.map(s =>
+      s.workout_day + ': ' + s.session_lifts.map(l => l.lift_name + ' ' + l.weight + 'lb ' + l.sets_passed + '/5').join(', ')
+    ).join(' | ');
+
+    const payload = {
+      weights: {
+        squat:    liftStates.squat?.weight    ?? 45,
+        bench:    liftStates.bench?.weight    ?? 45,
+        row:      liftStates.row?.weight      ?? 45,
+        press:    liftStates.press?.weight    ?? 45,
+        deadlift: liftStates.deadlift?.weight ?? 45,
+      },
+      recentSessions: recentSummary,
+      minIncrement: settings.minIncrement,
+    };
+
+    const { data: { session: authSession } } = await supabase.auth.getSession();
+    const resp = await fetch(`${SUPABASE_FUNCTIONS_URL}/generate-movement-workout`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${authSession.access_token}`,
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!resp.ok) throw new Error('Function returned ' + resp.status);
+    const workout = await resp.json();
+    if (workout.error) throw new Error(workout.error);
+
+    movementDayWorkout = workout;
+
+    // Render the workout
+    document.getElementById('movement-modal-title').textContent = workout.title || 'MOVEMENT DAY';
+    document.getElementById('movement-tagline').textContent = workout.tagline || '';
+
+    const bodyEl = document.getElementById('movement-modal-body');
+    bodyEl.innerHTML = workout.exercises.map(ex => {
+      const prescription = ex.bodyweight
+        ? `${ex.sets} × ${ex.reps} reps`
+        : `${ex.sets} × ${ex.reps} reps @ ${ex.weight} lb`;
+      return `<div class="movement-exercise">
+        <div class="movement-ex-header">
+          <span class="movement-ex-name">${ex.name}</span>
+          <span class="movement-ex-cat cat-${ex.category}">${ex.category}</span>
+        </div>
+        <div class="movement-ex-prescription">${prescription}</div>
+        <div class="movement-ex-note">${ex.note}</div>
+      </div>`;
+    }).join('');
+
+    document.getElementById('movement-do-it-btn').style.display = 'block';
+
+  } catch(e) {
+    console.error('Movement day error:', e);
+    document.getElementById('movement-modal-body').innerHTML = `
+      <div class="movement-loading">
+        <p style="color:var(--danger);">Failed to generate workout. Check your connection and try again.</p>
+        <p style="font-size:12px;color:var(--muted2);">${e.message}</p>
+      </div>`;
+  }
+};
+
+window.closeMovementDay = function() {
+  document.getElementById('movement-modal').classList.remove('open');
+};
+
+window.doMovementDay = function() {
+  if (!movementDayWorkout) return;
+  closeMovementDay();
+
+  // Replace current session with the movement day workout
+  currentSession = {
+    day: profile.next_workout, // doesn't count toward A/B alternation
+    isMovementDay: true,
+    liftResults: movementDayWorkout.exercises.map(ex => ({
+      liftId: 'movement_' + ex.name.toLowerCase().replace(/\s+/g, '_'),
+      name: ex.name,
+      increment: 0, // no progression on movement days
+      weight: ex.weight || 0,
+      barWeight: 0,
+      sets: Array(ex.sets).fill(null),
+      warmups: [],
+      locked: false,
+      movementDay: true,
+      prescription: ex.reps, // e.g. "10-12"
+      category: ex.category,
+    }))
+  };
+
+  accessoryItems = [];
+  saveDraftSession();
+  renderMovementWorkout();
+  toast('Movement day loaded — let's move!', 'success');
+};
+
+window.renderMovementWorkout = function() {
+  // Swap the lifts container to show movement day exercises
+  document.getElementById('workout-day').textContent = 'MOVEMENT DAY';
+
+  const container = document.getElementById('lifts-container');
+  container.innerHTML = currentSession.liftResults.map((lr, idx) => {
+    const recorded = lr.sets.filter(s => s !== null).length;
+    const catClass = `cat-${lr.category}`;
+
+    const setButtons = lr.sets.map((s, si) => {
+      const cls = s === true ? 'set-btn done' : 'set-btn';
+      return `<button class="${cls}" onclick="toggleMovementSet(${idx},${si})">${si+1}</button>`;
+    }).join('');
+
+    return `<div class="lift-card card ${recorded === lr.sets.length && recorded > 0 ? 'lift-done' : ''}">
+      <div class="lift-header">
+        <div>
+          <div class="lift-name">
+            ${lr.name}
+            <span class="movement-ex-cat ${catClass}" style="margin-left:8px;font-size:11px;">${lr.category}</span>
+          </div>
+          ${lr.weight > 0 ? '' : '<div class="lift-warn deload-note">Bodyweight</div>'}
+        </div>
+        <div class="lift-weight-block">
+          ${lr.weight > 0 ? `<div class="lift-weight">${lr.weight}<span>lb</span></div>` : ''}
+          <div class="lift-prescription">${lr.sets.length} × ${lr.prescription}</div>
+        </div>
+      </div>
+      <div class="sets-row">
+        ${setButtons}
+        <span class="sets-count">${recorded}/${lr.sets.length} sets</span>
+      </div>
+    </div>`;
+  }).join('');
+};
+
+window.toggleMovementSet = function(liftIdx, setIdx) {
+  const lr = currentSession.liftResults[liftIdx];
+  lr.sets[setIdx] = lr.sets[setIdx] === null ? true : null;
+  saveDraftSession();
+  renderMovementWorkout();
+  // Update finish button
+  const anyDone = currentSession.liftResults.some(lr => lr.sets.some(s => s !== null));
+  document.getElementById('finish-btn').disabled = !anyDone;
 };
 
 // ── Boot ──────────────────────────────────────────────────────
