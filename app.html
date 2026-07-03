@@ -425,6 +425,105 @@
       gap: 10px;
     }
 
+    /* ── Movement day button ────────────────────────── */
+    .movement-day-btn {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: transparent;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 7px 12px;
+      color: var(--muted);
+      font-size: 12px;
+      font-family: var(--font-b);
+      cursor: pointer;
+      white-space: nowrap;
+      flex-shrink: 0;
+      transition: border-color 0.12s, color 0.12s;
+      margin-top: 4px;
+    }
+    .movement-day-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+    /* ── Movement day modal ──────────────────────────── */
+    .movement-modal {
+      background: var(--surface);
+      border: 1px solid var(--border2);
+      border-radius: var(--radius-lg);
+      padding: 0;
+      max-width: 440px;
+      width: 100%;
+      max-height: 88vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .movement-modal-header {
+      padding: 24px 24px 16px;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .movement-modal-header h2 { font-size: 26px; margin-bottom: 4px; }
+    .movement-tagline { color: var(--muted); font-size: 14px; font-style: italic; }
+    .movement-modal-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px 24px;
+    }
+    .movement-exercise {
+      padding: 14px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .movement-exercise:last-child { border-bottom: none; }
+    .movement-ex-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 4px;
+    }
+    .movement-ex-name {
+      font-family: var(--font-d);
+      font-size: 20px;
+      font-weight: 700;
+    }
+    .movement-ex-cat {
+      font-family: var(--font-d);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      padding: 2px 8px;
+      border-radius: 4px;
+    }
+    .cat-Push { background: var(--accent-bg); color: var(--accent-dim); }
+    .cat-Pull { background: var(--info-bg); color: var(--info); }
+    .cat-Hinge, .cat-Core { background: var(--success-bg); color: var(--success); }
+    .movement-ex-prescription {
+      font-family: var(--font-d);
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--accent);
+      margin-bottom: 4px;
+    }
+    .movement-ex-note { font-size: 13px; color: var(--muted); font-style: italic; }
+    .movement-modal-footer {
+      padding: 16px 24px;
+      border-top: 1px solid var(--border);
+      flex-shrink: 0;
+      display: flex;
+      gap: 10px;
+    }
+    .movement-loading {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 48px 24px;
+      gap: 16px;
+      color: var(--muted);
+    }
+    .movement-loading p { font-size: 14px; }
+
     /* ── Warmup sets ─────────────────────────────────── */
     .warmup-sets {
       margin-bottom: 12px;
@@ -736,9 +835,17 @@
     <!-- Workout Tab -->
     <div class="tab-pane" id="tab-workout">
       <div class="workout-header">
-        <div class="workout-day-label" id="workout-day">WORKOUT A</div>
-        <div class="workout-title">TODAY'S SESSION</div>
-        <div class="workout-subtitle" id="workout-subtitle"></div>
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;">
+          <div>
+            <div class="workout-day-label" id="workout-day">WORKOUT A</div>
+            <div class="workout-title">TODAY'S SESSION</div>
+            <div class="workout-subtitle" id="workout-subtitle"></div>
+          </div>
+          <button class="movement-day-btn" onclick="openMovementDay()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+            Not feeling it?
+          </button>
+        </div>
       </div>
       <!-- Timer bar -->
       <div class="timer-bar">
@@ -820,6 +927,26 @@
     <div class="modal-actions">
       <button class="btn btn-ghost" onclick="closeFinishModal()">CANCEL</button>
       <button class="btn btn-primary" onclick="confirmFinish()">SAVE</button>
+    </div>
+  </div>
+</div>
+
+<!-- Movement Day Modal -->
+<div class="modal-overlay" id="movement-modal">
+  <div class="movement-modal">
+    <div class="movement-modal-header">
+      <h2 id="movement-modal-title">MOVEMENT DAY</h2>
+      <div class="movement-tagline" id="movement-tagline"></div>
+    </div>
+    <div class="movement-modal-body" id="movement-modal-body">
+      <div class="movement-loading">
+        <span class="spinner" style="width:28px;height:28px;border-width:3px;color:var(--accent);"></span>
+        <p>Generating your workout…</p>
+      </div>
+    </div>
+    <div class="movement-modal-footer">
+      <button class="btn btn-ghost btn-full" onclick="closeMovementDay()">CANCEL</button>
+      <button class="btn btn-primary btn-full" id="movement-do-it-btn" onclick="doMovementDay()" style="display:none;">DO THIS WORKOUT</button>
     </div>
   </div>
 </div>
