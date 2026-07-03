@@ -1016,6 +1016,45 @@
 <!-- Toast -->
 <div id="toast" class="toast"></div>
 
+<script>
+// Stub all onclick functions so they queue if the module hasn't loaded yet
+(function() {
+  const fns = [
+    'showTab','startTimer','openFinishModal','closeFinishModal','confirmFinish',
+    'timingModalConfirm','timingModalCancel','openMovementDay','closeMovementDay',
+    'doMovementDay','renderMovementWorkout','toggleMovementSet',
+    'openExercisePicker','closeExercisePicker','openAddCustomExercise',
+    'closeCustomExercise','saveCustomExercise','setPickerCategory','filterPicker',
+    'cycleSet','toggleWarmup','editLiftWeight','addSuggestedAccessory',
+    'addAccessoryFromPicker','removeAccessory','addAccessorySet',
+    'removeAccessorySet','updateAccessorySet','editLift','editName',
+    'toggleDay','editMinIncrement','handleSignOut'
+  ];
+  const queue = {};
+  fns.forEach(fn => {
+    queue[fn] = [];
+    window[fn] = function(...args) {
+      // If the real function has been assigned, call it
+      if (window['_real_' + fn]) return window['_real_' + fn](...args);
+      queue[fn].push(args);
+    };
+  });
+  // After module loads, real functions replace stubs via window.X = ...
+  // We intercept that assignment to flush the queue
+  fns.forEach(fn => {
+    Object.defineProperty(window, fn, {
+      set(realFn) {
+        window['_real_' + fn] = realFn;
+        // Flush any queued calls
+        (queue[fn] || []).forEach(args => realFn(...args));
+        queue[fn] = [];
+      },
+      get() { return window['_real_' + fn] || function() {}; },
+      configurable: true,
+    });
+  });
+})();
+</script>
 <script type="module" src="js/app.js"></script>
 
 </body>
