@@ -1417,7 +1417,7 @@ window.doMovementDay = function() {
   accessoryItems = [];
   saveDraftSession();
   renderMovementWorkout();
-  toast('Movement day loaded — let's move!', 'success');
+  toast('Movement day loaded — time to move!', 'success');
 };
 
 window.renderMovementWorkout = function() {
