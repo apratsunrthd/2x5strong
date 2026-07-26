@@ -134,3 +134,4 @@ Then open `http://localhost:3000`
 - **Email confirmation**: By default Supabase requires email confirmation on signup. Users will get a confirmation email before they can log in. You can disable this in Supabase → Authentication → Settings if you want frictionless testing.
 - **Starting weights**: All lifts default to 45 lb (the bar). Each user can edit their starting weights in Settings after signing up.
 - **Supabase free tier**: Projects on the free tier pause after 1 week of inactivity. For production use, upgrade to Pro ($25/month) or keep the project active.
+- We had a weird workflow/action hangup in July that looks like it's now resolved. If it gets hung and you can't cancel, you may have to submit a support ticket.
