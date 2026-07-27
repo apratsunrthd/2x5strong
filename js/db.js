@@ -82,11 +82,16 @@ export async function getSessions(userId, limit = 50) {
 // ── Edit historical session data ────────────────────────────────
 
 export async function updateSessionLift(id, updates) {
-  const { error } = await supabase
+  if (!id) throw new Error('updateSessionLift called with no id — nothing was saved');
+  const { data, error } = await supabase
     .from('session_lifts')
     .update(updates)
-    .eq('id', id);
+    .eq('id', id)
+    .select();
   if (error) throw error;
+  if (!data || data.length === 0) {
+    throw new Error('No matching row found for session_lifts id ' + id + ' — nothing was saved');
+  }
 }
 
 export async function saveSession(userId, workoutDay, liftResults) {
@@ -271,9 +276,14 @@ export async function getMovementSessions(userId, limit = 50) {
 }
 
 export async function updateMovementSessionExercise(id, updates) {
-  const { error } = await supabase
+  if (!id) throw new Error('updateMovementSessionExercise called with no id — nothing was saved');
+  const { data, error } = await supabase
     .from('movement_session_exercises')
     .update(updates)
-    .eq('id', id);
+    .eq('id', id)
+    .select();
   if (error) throw error;
+  if (!data || data.length === 0) {
+    throw new Error('No matching row found for movement_session_exercises id ' + id + ' — nothing was saved');
+  }
 }

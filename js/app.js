@@ -1355,7 +1355,7 @@ window.saveEditHistory = async function() {
 
   } catch (e) {
     console.error('Edit save error:', e);
-    toast('Failed to save changes', 'error');
+    toast(e.message || 'Failed to save changes', 'error');
   }
 };
 
