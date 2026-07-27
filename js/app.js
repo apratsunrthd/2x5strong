@@ -900,14 +900,15 @@ window.renderHistory = async function() {
       }
 
       const liftsHtml = s.session_lifts.map(l => {
-        const cls = l.sets_passed === 5 ? 'h-lift pass' : 'h-lift fail';
+        // Legacy data: movement day sessions saved before movement_sessions
+        // existed got stored here with lift_id like "movement_...". Those use
+        // rep ranges (e.g. 12), not the 5-rep pass/fail model, so the normal
+        // "X/5" badge is meaningless for them — show total reps instead.
+        const isLegacyMovement = (l.lift_id || '').startsWith('movement_');
 
-        // Work volume: only sets where reps === 5 count as full sets,
-        // but include actual reps for partial sets too
         const workSets = (l.sets_json || []).filter(s => s !== null && s !== 'locked');
         const workVolume = workSets.reduce((acc, reps) => acc + (reps * l.weight), 0);
 
-        // Warmup volume: only completed warmup sets
         const warmupVolume = (l.warmups_json || [])
           .filter(w => w.done)
           .reduce((acc, w) => acc + (w.reps * w.weight), 0);
@@ -915,6 +916,12 @@ window.renderHistory = async function() {
         const totalVolume = workVolume + warmupVolume;
         const volumeStr = totalVolume > 0 ? ` · ${Math.round(totalVolume).toLocaleString()}lb` : '';
 
+        if (isLegacyMovement) {
+          const totalReps = workSets.reduce((a, v) => a + v, 0);
+          return `<span class="h-lift" style="color:var(--info);">${l.lift_name} ${l.weight > 0 ? l.weight+'lb' : 'BW'} ${totalReps}r${volumeStr}</span>`;
+        }
+
+        const cls = l.sets_passed === 5 ? 'h-lift pass' : 'h-lift fail';
         const expectedSets = l.lift_id === 'deadlift' && l.weight >= 225 ? 1 : 5;
         return `<span class="${cls}">${l.lift_name} ${l.weight}lb ${l.sets_passed}/${expectedSets}${volumeStr}</span>`;
       }).join('');
