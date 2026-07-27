@@ -27,7 +27,6 @@ serve(async (req) => {
 
   try {
     const body = await req.json();
-    // Client sends pre-built prompt — use it directly
     const prompt = body.prompt;
     const minIncrement = body.minIncrement || 5;
 
@@ -44,19 +43,30 @@ serve(async (req) => {
       },
       body: JSON.stringify({
         model: 'claude-sonnet-5',
-        max_tokens: 1024,
+        max_tokens: 2048,
         messages: [{ role: 'user', content: prompt }],
       }),
     });
 
-    if (!response.ok) throw new Error(`Anthropic API error: ${response.status}`);
+    if (!response.ok) {
+      const errText = await response.text();
+      throw new Error(`Anthropic API error: ${response.status} — ${errText}`);
+    }
 
     const data = await response.json();
-    const text = data.content[0].text.trim();
+
+    // Sonnet 5 has adaptive thinking on by default, so content[0] may be a
+    // "thinking" block rather than "text" — find the actual text block instead
+    // of assuming position.
+    const textBlock = data.content?.find((c: any) => c.type === 'text');
+    if (!textBlock || !textBlock.text) {
+      throw new Error('No text content found in Claude response');
+    }
+
+    const text = textBlock.text.trim();
     const clean = text.replace(/```json|```/g, '').trim();
     let workout = JSON.parse(clean);
 
-    // Snap weights to minIncrement in code — don't trust Claude's math
     workout = snapWeights(workout, minIncrement);
 
     return new Response(JSON.stringify(workout), {
