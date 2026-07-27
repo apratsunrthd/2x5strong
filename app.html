@@ -542,6 +542,7 @@
       border-radius: 4px;
     }
     .cat-Push { background: var(--accent-bg); color: var(--accent-dim); }
+    .cat-MetCon { background: rgba(224,82,82,0.1); color: var(--danger); }
     .cat-Pull { background: var(--info-bg); color: var(--info); }
     .cat-Hinge, .cat-Core { background: var(--success-bg); color: var(--success); }
     .movement-ex-prescription {
@@ -990,6 +991,13 @@
         <p>Generating your workout…</p>
       </div>
     </div>
+    <div class="movement-metcon-toggle" id="movement-metcon-row" style="display:none;padding:12px 24px 0;border-top:1px solid var(--border);">
+      <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:13px;color:var(--muted);">
+        <input type="checkbox" id="metcon-toggle" checked onchange="toggleMetcon()"
+          style="width:16px;height:16px;accent-color:var(--accent);cursor:pointer;">
+        Include MetCon finisher
+      </label>
+    </div>
     <div class="movement-modal-footer">
       <button class="btn btn-ghost btn-full" onclick="closeMovementDay()">CANCEL</button>
       <button class="btn btn-ghost btn-full" id="movement-reroll-btn" onclick="rerollMovementDay()" style="display:none;">REROLL</button>
@@ -1073,7 +1081,7 @@
     'openExercisePicker','closeExercisePicker','openAddCustomExercise',
     'closeCustomExercise','saveCustomExercise','setPickerCategory','filterPicker',
     'cycleSet','toggleWarmup','editLiftWeight','addSuggestedAccessory',
-    'cycleMovementSet','toggleMovementLock','rerollMovementDay','toggleMovementPrompt','editMovementWeight',
+    'cycleMovementSet','toggleMovementLock','rerollMovementDay','toggleMovementPrompt','editMovementWeight','toggleMetcon','toggleMetconDone',
     'addAccessoryFromPicker','removeAccessory','addAccessorySet',
     'removeAccessorySet','updateAccessorySet','editLift','editName',
     'toggleDay','editMinIncrement','handleSignOut'
