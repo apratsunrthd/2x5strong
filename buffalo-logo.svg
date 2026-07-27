@@ -1,0 +1,62 @@
+<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+  <!-- 2X5 STRONG Buffalo Mascot -->
+  <!-- Horns -->
+  <path d="M40 70 Q15 55 8 30 Q6 22 12 20 Q20 18 24 28 Q30 45 48 62 Z" fill="#e8d44d"/>
+  <path d="M160 70 Q185 55 192 30 Q194 22 188 20 Q180 18 176 28 Q170 45 152 62 Z" fill="#e8d44d"/>
+  <path d="M42 68 Q22 58 16 34" stroke="#b8a93a" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+  <path d="M158 68 Q178 58 184 34" stroke="#b8a93a" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+
+  <!-- Head/skull base -->
+  <path d="M100 55
+           C 60 55, 35 80, 32 115
+           C 30 145, 45 168, 65 178
+           L 75 182
+           C 85 186, 115 186, 125 182
+           L 135 178
+           C 155 168, 170 145, 168 115
+           C 165 80, 140 55, 100 55 Z"
+        fill="#f0ede6"/>
+
+  <!-- Muscular brow ridge / forehead shading -->
+  <path d="M45 95 Q100 75 155 95 Q150 108 100 108 Q50 108 45 95 Z" fill="#d8d2c4"/>
+
+  <!-- Eyes -->
+  <ellipse cx="72" cy="105" rx="7" ry="9" fill="#171717"/>
+  <ellipse cx="128" cy="105" rx="7" ry="9" fill="#171717"/>
+  <circle cx="74" cy="102" r="2" fill="#f0ede6"/>
+  <circle cx="130" cy="102" r="2" fill="#f0ede6"/>
+
+  <!-- Snout -->
+  <path d="M65 145
+           C 65 130, 78 122, 100 122
+           C 122 122, 135 130, 135 145
+           C 135 168, 118 180, 100 180
+           C 82 180, 65 168, 65 145 Z"
+        fill="#e0dbcc"/>
+
+  <!-- Nostrils -->
+  <ellipse cx="85" cy="158" rx="6" ry="9" fill="#171717"/>
+  <ellipse cx="115" cy="158" rx="6" ry="9" fill="#171717"/>
+
+  <!-- Jaw muscle definition -->
+  <path d="M40 130 Q35 150 50 168" stroke="#c8c2b2" stroke-width="4" fill="none" stroke-linecap="round" opacity="0.6"/>
+  <path d="M160 130 Q165 150 150 168" stroke="#c8c2b2" stroke-width="4" fill="none" stroke-linecap="round" opacity="0.6"/>
+
+  <!-- Neck / massive shoulder traps -->
+  <path d="M55 170
+           C 40 190, 25 200, 15 200
+           L 15 220
+           C 40 220, 65 205, 78 188
+           Z"
+        fill="#e8d44d"/>
+  <path d="M145 170
+           C 160 190, 175 200, 185 200
+           L 185 220
+           C 160 220, 135 205, 122 188
+           Z"
+        fill="#e8d44d"/>
+
+  <!-- Trap muscle striations -->
+  <path d="M30 195 Q45 188 60 178" stroke="#b8a93a" stroke-width="2" fill="none" stroke-linecap="round" opacity="0.7"/>
+  <path d="M170 195 Q155 188 140 178" stroke="#b8a93a" stroke-width="2" fill="none" stroke-linecap="round" opacity="0.7"/>
+</svg>

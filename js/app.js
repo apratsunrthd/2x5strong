@@ -84,12 +84,24 @@ function resetTimer() {
 // ── Global settings (stored in localStorage) ─────────────────
 const SETTINGS_KEY = '2x5strong_settings';
 
+// Default Rogue Monster Band colors, light to heavy assistance.
+// Editable in Settings — order matters (used for light-to-heavy display).
+const DEFAULT_BAND_COLORS = [
+  { name: 'Orange', hex: '#f0923b' },
+  { name: 'Red',    hex: '#e05252' },
+  { name: 'Blue',   hex: '#5297e0' },
+  { name: 'Green',  hex: '#52c97a' },
+  { name: 'Black',  hex: '#3a3a3a' },
+  { name: 'Purple', hex: '#a07cf8' },
+  { name: 'Silver', hex: '#b8b8b8' },
+];
+
 function getGlobalSettings() {
   try {
     const raw = localStorage.getItem(SETTINGS_KEY);
-    if (raw) return { minIncrement: 5, ...JSON.parse(raw) };
+    if (raw) return { minIncrement: 5, bandColors: DEFAULT_BAND_COLORS, ...JSON.parse(raw) };
   } catch(e) {}
-  return { minIncrement: 5 };
+  return { minIncrement: 5, bandColors: DEFAULT_BAND_COLORS };
 }
 
 function saveGlobalSettings(settings) {
@@ -190,7 +202,14 @@ async function init() {
       lastSetTime = draft.timerLast;
       startTimer();
     }
-    renderWorkout();
+    // Movement day drafts need the movement renderer, not the regular one —
+    // regular renderWorkout() assumes 5-rep prescriptions and was showing "3x5"
+    // for movement day exercises that actually have their own rep ranges.
+    if (currentSession.isMovementDay) {
+      renderMovementWorkout();
+    } else {
+      renderWorkout();
+    }
     renderAccessories();
     toast('Session restored', 'success');
   } else {
@@ -238,7 +257,7 @@ async function checkSessionTiming() {
       const dayWord = Math.round(daysSince) === 1 ? 'day' : 'days';
       showTimingModal({
         title: '📅 BEEN A WHILE',
-        body: `It has been ${Math.round(daysSince)} ${dayWord} since your last session. Your body may need time to readjust — consider a deload: drop all weights to 90% for this session to ease back in and avoid injury. Or tap "Not feeling it?" for a lighter movement day instead.`,
+        body: `It has been ${Math.round(daysSince)} ${dayWord} since your last session. Your body may need time to readjust — consider a deload: drop all weights to 90% for this session to ease back in and avoid injury. Or tap "MOVE" for a lighter session instead.`,
         confirmLabel: 'DELOAD THIS SESSION',
         confirmStyle: 'background: var(--info); color: #fff;',
         cancelLabel: 'LIFT FULL WEIGHT',
@@ -671,6 +690,12 @@ window.confirmFinish = async function() {
             const moves = (d.movements || []).map(m => m.movement + ' x' + m.reps).join(', ');
             prescription = (d.format || '') + ' ' + (d.duration || '') + ': ' + moves;
           }
+          // Bake bodyweight modifier (band assist or added weight) into prescription for storage
+          if (lr.modifierType === 'band' && lr.modifierValue) {
+            prescription += ' [' + lr.modifierValue + ' band assist]';
+          } else if (lr.modifierType === 'weight' && lr.modifierValue) {
+            prescription += ' [+' + lr.modifierValue + 'lb added]';
+          }
           return {
             name: lr.name,
             category: lr.category,
@@ -912,7 +937,7 @@ window.renderHistory = async function() {
             const sets = (a.sets_json || []).filter(s => s.reps);
             if (sets.length === 0) return '';
             const summary = sets.map(s => {
-              if (a.exercise_type === 'assisted') return `${s.reps}r${s.assistance ? ' -'+s.assistance+'lb' : ''}`;
+              if (a.exercise_type === 'assisted') return `${s.reps}r${s.bandColor ? ' ('+s.bandColor+' band)' : ''}`;
               return `${s.reps}r${s.weight ? ' @'+s.weight+'lb' : ''}`;
             }).join(', ');
             return `<span class="h-lift" style="color:var(--muted);">${a.exercise_name}: ${summary}</span>`;
@@ -1051,14 +1076,20 @@ window.renderAccessories = function() {
     const setsHtml = item.sets.map((s, si) => {
       let inputs = '';
       if (item.type === 'assisted') {
+        const bandColors = getGlobalSettings().bandColors || DEFAULT_BAND_COLORS;
+        const bandOptions = bandColors.map(b =>
+          `<option value="${b.name}" ${s.bandColor === b.name ? 'selected' : ''}>${b.name}</option>`
+        ).join('');
         inputs = `
           <input class="accessory-input" type="number" min="0" placeholder="reps"
             value="${s.reps || ''}" oninput="updateAccessorySet(${idx},${si},'reps',this.value)">
           <span class="accessory-input-label">reps</span>
-          <input class="accessory-input" type="number" min="0" placeholder="band"
-            value="${s.assistance || ''}" oninput="updateAccessorySet(${idx},${si},'assistance',this.value)"
-            style="border-color:var(--info);">
-          <span class="accessory-input-label" style="color:var(--info);">lb assist</span>`;
+          <select class="accessory-input" style="border-color:var(--info);width:auto;"
+            onchange="updateAccessorySetField(${idx},${si},'bandColor',this.value)">
+            <option value="">No band</option>
+            ${bandOptions}
+          </select>
+          <span class="accessory-input-label" style="color:var(--info);">band</span>`;
       } else {
         inputs = `
           <input class="accessory-input" type="number" min="0" placeholder="reps"
@@ -1095,7 +1126,7 @@ window.renderAccessories = function() {
 window.addSuggestedAccessory = function(name, type, category) {
   // Pre-populate with last session's data nudged slightly
   const lastEntry = lastAccessories.find(a => a.exercise_name === name);
-  let sets = [{ reps: '', weight: '', assistance: '' }];
+  let sets = [{ reps: '', weight: '', assistance: '', bandColor: '' }];
   if (lastEntry && lastEntry.sets_json && lastEntry.sets_json.length > 0) {
     sets = lastEntry.sets_json.map(s => ({ ...s }));
   }
@@ -1104,7 +1135,7 @@ window.addSuggestedAccessory = function(name, type, category) {
 };
 
 window.addAccessoryFromPicker = function(name, type, category) {
-  accessoryItems.push({ name, type, category, sets: [{ reps: '', weight: '', assistance: '' }] });
+  accessoryItems.push({ name, type, category, sets: [{ reps: '', weight: '', assistance: '', bandColor: '' }] });
   renderAccessories();
   closeExercisePicker();
 }
@@ -1116,7 +1147,7 @@ window.removeAccessory = function(idx) {
 };
 
 window.addAccessorySet = function(idx) {
-  accessoryItems[idx].sets.push({ reps: '', weight: '', assistance: '' });
+  accessoryItems[idx].sets.push({ reps: '', weight: '', assistance: '', bandColor: '' });
   saveDraftSession();
   renderAccessories();
 };
@@ -1124,7 +1155,7 @@ window.addAccessorySet = function(idx) {
 window.removeAccessorySet = function(idx, si) {
   accessoryItems[idx].sets.splice(si, 1);
   if (accessoryItems[idx].sets.length === 0) {
-    accessoryItems[idx].sets.push({ reps: '', weight: '', assistance: '' });
+    accessoryItems[idx].sets.push({ reps: '', weight: '', assistance: '', bandColor: '' });
   }
   saveDraftSession();
   renderAccessories();
@@ -1133,6 +1164,12 @@ window.removeAccessorySet = function(idx, si) {
 window.updateAccessorySet = function(idx, si, field, value) {
   accessoryItems[idx].sets[si][field] = value === '' ? '' : parseFloat(value) || 0;
   saveDraftSession(); // lightweight localStorage write, fine on keystroke
+};
+
+// For string fields like bandColor — no numeric parsing
+window.updateAccessorySetField = function(idx, si, field, value) {
+  accessoryItems[idx].sets[si][field] = value;
+  saveDraftSession();
 };
 
 // ── Exercise picker ───────────────────────────────────────────
@@ -1247,6 +1284,61 @@ window.buildIncrementRows = function() {
   }).join('');
 }
 
+// ── Band color settings ────────────────────────────────────────
+
+window.buildBandColorRows = function() {
+  const settings = getGlobalSettings();
+  const colors = settings.bandColors || DEFAULT_BAND_COLORS;
+  return colors.map((b, i) => {
+    return '<div class="settings-row">'
+      + '<div style="display:flex;align-items:center;gap:10px;">'
+      + '<div style="width:20px;height:20px;border-radius:50%;background:' + b.hex + ';border:1px solid var(--border2);"></div>'
+      + '<span class="settings-label">' + b.name + '</span>'
+      + '</div>'
+      + '<div style="display:flex;gap:6px;">'
+      + '<button class="btn btn-ghost btn-sm" onclick="editBandColor(' + i + ')">EDIT</button>'
+      + '<button class="btn btn-ghost btn-sm" onclick="removeBandColor(' + i + ')">✕</button>'
+      + '</div></div>';
+  }).join('');
+};
+
+window.editBandColor = function(idx) {
+  const settings = getGlobalSettings();
+  const colors = settings.bandColors || DEFAULT_BAND_COLORS;
+  const band = colors[idx];
+  const name = prompt('Band name:', band.name);
+  if (!name || !name.trim()) return;
+  const hex = prompt('Band color (hex, e.g. #e05252):', band.hex);
+  if (!hex || !/^#[0-9a-fA-F]{6}$/.test(hex)) { toast('Invalid hex color', 'error'); return; }
+  colors[idx] = { name: name.trim(), hex };
+  settings.bandColors = colors;
+  saveGlobalSettings(settings);
+  renderSettings();
+};
+
+window.addBandColor = function() {
+  const settings = getGlobalSettings();
+  const colors = settings.bandColors || [...DEFAULT_BAND_COLORS];
+  const name = prompt('New band name:', 'Custom');
+  if (!name || !name.trim()) return;
+  const hex = prompt('Band color (hex, e.g. #e05252):', '#888888');
+  if (!hex || !/^#[0-9a-fA-F]{6}$/.test(hex)) { toast('Invalid hex color', 'error'); return; }
+  colors.push({ name: name.trim(), hex });
+  settings.bandColors = colors;
+  saveGlobalSettings(settings);
+  renderSettings();
+};
+
+window.removeBandColor = function(idx) {
+  const settings = getGlobalSettings();
+  const colors = settings.bandColors || [...DEFAULT_BAND_COLORS];
+  if (colors.length <= 1) { toast('Keep at least one band color', 'error'); return; }
+  colors.splice(idx, 1);
+  settings.bandColors = colors;
+  saveGlobalSettings(settings);
+  renderSettings();
+};
+
 // ── Edit History ─────────────────────────────────────────────
 
 let editingSessionId = null;
@@ -1348,7 +1440,7 @@ window.saveEditHistory = async function() {
 
   } catch (e) {
     console.error('Edit save error:', e);
-    toast('Failed to save changes', 'error');
+    toast(e.message || 'Failed to save changes', 'error');
   }
 };
 
@@ -1421,6 +1513,13 @@ window.renderSettings = function() {
         </div>
       </div>
       ${buildIncrementRows()}
+    </div>
+
+    <div class="settings-section">
+      <div class="settings-section-title">Resistance Bands</div>
+      <div class="text-muted" style="font-size:12px;margin-bottom:8px;">Used for band-assisted exercises like pull-ups and dips</div>
+      ${buildBandColorRows()}
+      <button class="btn btn-ghost btn-sm" style="margin-top:8px;" onclick="addBandColor()">+ ADD BAND</button>
     </div>
 
     <div class="settings-section">
@@ -1899,6 +1998,8 @@ window.doMovementDay = function() {
         movementDay: true,
         prescription: isMetcon ? ex.reps : ex.reps,
         metconDetails: ex.metconDetails || null,
+        modifierType: null,
+        modifierValue: null,
         maxReps,
         category: ex.category,
       };
@@ -1962,6 +2063,18 @@ window.renderMovementWorkout = function() {
     const totalReps = recordedSets.reduce((a, v) => a + (v || 0), 0);
     const summaryLabel = recordedSets.length === 0 ? 'tap to record' : `${totalReps} reps done`;
 
+    // Bodyweight exercises can optionally get a band-assist or added-weight modifier
+    let modifierBadge = '';
+    if (lr.weight === 0) {
+      if (lr.modifierType === 'band' && lr.modifierValue) {
+        modifierBadge = `<div class="lift-warn deload-note" style="color:var(--info);">${lr.modifierValue} band assist</div>`;
+      } else if (lr.modifierType === 'weight' && lr.modifierValue) {
+        modifierBadge = `<div class="lift-warn deload-note" style="color:var(--accent-dim);">+${lr.modifierValue} lb added</div>`;
+      } else {
+        modifierBadge = '<div class="lift-warn deload-note">Bodyweight</div>';
+      }
+    }
+
     return `<div class="lift-card card ${allDone ? 'lift-done' : ''}">
       <div class="lift-header">
         <div>
@@ -1969,11 +2082,11 @@ window.renderMovementWorkout = function() {
             ${lr.name}
             <span class="movement-ex-cat ${catClass}" style="margin-left:8px;font-size:11px;">${lr.category}</span>
           </div>
-          ${lr.weight === 0 ? '<div class="lift-warn deload-note">Bodyweight</div>' : ''}
+          ${modifierBadge}
         </div>
-        <div class="lift-weight-block" ${lr.weight > 0 ? `onclick="editMovementWeight(${idx})" style="cursor:pointer;" title="Tap to edit weight"` : ''}>
+        <div class="lift-weight-block" onclick="${lr.weight > 0 ? `editMovementWeight(${idx})` : `editMovementModifier(${idx})`}" style="cursor:pointer;" title="Tap to edit">
           ${lr.weight > 0 ? `<div class="lift-weight">${lr.weight}<span>lb</span></div>` : ''}
-          <div class="lift-prescription">${lr.sets.length} × ${lr.prescription} ${lr.weight > 0 ? '<span style="font-size:10px;color:var(--muted2);">✎</span>' : ''}</div>
+          <div class="lift-prescription">${lr.sets.length} × ${lr.prescription} <span style="font-size:10px;color:var(--muted2);">✎</span></div>
         </div>
       </div>
       <div class="sets-row">
@@ -2009,6 +2122,42 @@ window.editMovementWeight = function(liftIdx) {
   saveDraftSession();
   renderMovementWorkout();
   toast(lr.name + ' updated to ' + lr.weight + ' lb', 'success');
+};
+
+// For bodyweight exercises (weight === 0) — offer band assist or added weight
+window.editMovementModifier = function(liftIdx) {
+  const lr = currentSession.liftResults[liftIdx];
+  const settings = getGlobalSettings();
+  const bandColors = settings.bandColors || DEFAULT_BAND_COLORS;
+
+  const bandNames = bandColors.map(b => b.name).join(', ');
+  const choice = prompt(
+    lr.name + ' — add a modifier?\n\n' +
+    'Type a band color for assistance (' + bandNames + '),\n' +
+    'or a number for added weight in lb,\n' +
+    'or leave blank to clear.',
+    lr.modifierType === 'band' ? lr.modifierValue : (lr.modifierType === 'weight' ? lr.modifierValue : '')
+  );
+
+  if (choice === null) return; // cancelled
+
+  const trimmed = choice.trim();
+  if (trimmed === '') {
+    lr.modifierType = null;
+    lr.modifierValue = null;
+  } else if (!isNaN(parseFloat(trimmed))) {
+    lr.modifierType = 'weight';
+    lr.modifierValue = roundToIncrement(parseFloat(trimmed), settings.minIncrement);
+  } else {
+    const match = bandColors.find(b => b.name.toLowerCase() === trimmed.toLowerCase());
+    if (!match) { toast('Unknown band color — try: ' + bandNames, 'error'); return; }
+    lr.modifierType = 'band';
+    lr.modifierValue = match.name;
+  }
+
+  saveDraftSession();
+  renderMovementWorkout();
+  toast(lr.name + ' updated', 'success');
 };
 
 // ── Boot ──────────────────────────────────────────────────────
