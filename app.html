@@ -598,6 +598,47 @@
     }
     .movement-loading p { font-size: 14px; }
 
+    /* ── Edit history ────────────────────────────────── */
+    .edit-lift-block {
+      padding: 14px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .edit-lift-block:last-child { border-bottom: none; }
+    .edit-lift-name {
+      font-family: var(--font-d);
+      font-size: 17px;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+    .edit-weight-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+    .edit-weight-row label {
+      font-size: 12px;
+      color: var(--muted);
+      min-width: 50px;
+    }
+    .edit-sets-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .edit-set-cell {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 3px;
+    }
+    .edit-set-cell label {
+      font-size: 10px;
+      color: var(--muted2);
+      font-family: var(--font-d);
+      text-transform: uppercase;
+    }
+
     /* ── Warmup sets ─────────────────────────────────── */
     .warmup-sets {
       margin-bottom: 12px;
@@ -1083,6 +1124,20 @@
   </div>
 </div>
 
+<!-- Edit History Modal -->
+<div class="modal-overlay" id="edit-history-modal">
+  <div class="picker-modal">
+    <div class="picker-header">
+      <h2>EDIT SESSION</h2>
+    </div>
+    <div class="picker-list" id="edit-history-body"></div>
+    <div class="picker-footer">
+      <button class="btn btn-ghost btn-full" onclick="closeEditHistory()">CANCEL</button>
+      <button class="btn btn-primary btn-full" onclick="saveEditHistory()">SAVE CHANGES</button>
+    </div>
+  </div>
+</div>
+
 <!-- Timing Warning Modal -->
 <div class="modal-overlay" id="timing-modal">
   <div class="modal-box">
@@ -1109,6 +1164,7 @@
     'closeCustomExercise','saveCustomExercise','setPickerCategory','filterPicker',
     'cycleSet','toggleWarmup','editLiftWeight','addSuggestedAccessory',
     'cycleMovementSet','toggleMovementLock','rerollMovementDay','toggleMovementPrompt','editMovementWeight','toggleMetcon','toggleMetconDone',
+    'openEditHistory','closeEditHistory','saveEditHistory','updateEditSet','updateEditWeight',
     'addAccessoryFromPicker','removeAccessory','addAccessorySet',
     'removeAccessorySet','updateAccessorySet','editLift','editName',
     'toggleDay','editMinIncrement','handleSignOut'
