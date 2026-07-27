@@ -190,7 +190,14 @@ async function init() {
       lastSetTime = draft.timerLast;
       startTimer();
     }
-    renderWorkout();
+    // Movement day drafts need the movement renderer, not the regular one —
+    // regular renderWorkout() assumes 5-rep prescriptions and was showing "3x5"
+    // for movement day exercises that actually have their own rep ranges.
+    if (currentSession.isMovementDay) {
+      renderMovementWorkout();
+    } else {
+      renderWorkout();
+    }
     renderAccessories();
     toast('Session restored', 'success');
   } else {
