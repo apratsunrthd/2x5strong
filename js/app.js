@@ -1381,6 +1381,7 @@ const SUPABASE_FUNCTIONS_URL = 'https://aqbrhcdaarpcymhgshuh.supabase.co/functio
 let movementDayWorkout = null;  // current AI-generated workout
 let movementLockedExercises = {}; // { index: exerciseObj } — locked in place on reroll
 let lastMovementPrompt = '';    // for "show prompt" feature
+let includeMetcon = true;       // whether to include a MetCon finisher
 
 // Parse the max reps from a range string like "10-12" → 12, or "10" → 10
 function parseMaxReps(repsStr) {
@@ -1494,7 +1495,7 @@ async function fetchMovementWorkout(lockedExercises) {
     deadlift: liftStates.deadlift?.weight ?? 45,
   };
 
-  lastMovementPrompt = buildMovementPrompt(weights, recentSummary, settings.minIncrement, lockedExercises, daysSinceLast);
+  lastMovementPrompt = buildMovementPrompt(weights, recentSummary, settings.minIncrement, lockedExercises, daysSinceLast, includeMetcon);
 
   const { data: { session: authSession } } = await supabase.auth.getSession();
   const resp = await fetch(`${SUPABASE_FUNCTIONS_URL}/generate-movement-workout`, {
@@ -1561,12 +1562,20 @@ function renderMovementModal(workout, locked) {
   document.getElementById('movement-modal-body').innerHTML = exercisesHtml + promptHtml;
   document.getElementById('movement-do-it-btn').style.display = 'block';
   document.getElementById('movement-reroll-btn').style.display = 'block';
+  // Show MetCon toggle
+  const metconRow = document.getElementById('movement-metcon-row');
+  if (metconRow) {
+    metconRow.style.display = 'block';
+    const toggle = document.getElementById('metcon-toggle');
+    if (toggle) toggle.checked = includeMetcon;
+  }
 }
 
 window.openMovementDay = async function() {
   movementDayWorkout = null;
   movementLockedExercises = {};
   lastMovementPrompt = '';
+  includeMetcon = true;
   document.getElementById('movement-modal-title').textContent = 'MOVEMENT DAY';
   document.getElementById('movement-tagline').textContent = '';
   document.getElementById('movement-do-it-btn').style.display = 'none';
@@ -1656,6 +1665,13 @@ window.toggleMovementPrompt = function() {
   if (btn) btn.textContent = isHidden ? 'Hide prompt ▴' : 'Show prompt ▾';
 };
 
+window.toggleMetcon = async function() {
+  const toggle = document.getElementById('metcon-toggle');
+  includeMetcon = toggle ? toggle.checked : true;
+  // Reroll to include/exclude MetCon
+  await rerollMovementDay();
+};
+
 window.closeMovementDay = function() {
   document.getElementById('movement-modal').classList.remove('open');
 };
@@ -1668,19 +1684,21 @@ window.doMovementDay = function() {
     day: profile.next_workout,
     isMovementDay: true,
     liftResults: movementDayWorkout.exercises.map(ex => {
-      const maxReps = parseMaxReps(ex.reps);
+      const isMetcon = ex.category === 'MetCon';
+      const maxReps = isMetcon ? 1 : parseMaxReps(ex.reps);
       return {
         liftId: 'movement_' + ex.name.toLowerCase().replace(/\s+/g, '_'),
         name: ex.name,
         increment: 0,
         weight: ex.weight || 0,
         barWeight: 0,
-        // null = unrecorded, number = reps completed
-        sets: Array(ex.sets).fill(null),
+        // MetCon: single true/null toggle; others: rep count
+        sets: isMetcon ? [null] : Array(ex.sets).fill(null),
         warmups: [],
         locked: false,
         movementDay: true,
-        prescription: ex.reps,
+        prescription: isMetcon ? ex.reps : ex.reps,
+        metconPrescription: ex.metconPrescription || null,
         maxReps,
         category: ex.category,
       };
@@ -1698,26 +1716,42 @@ window.renderMovementWorkout = function() {
 
   const container = document.getElementById('lifts-container');
   container.innerHTML = currentSession.liftResults.map((lr, idx) => {
+    const catClass = 'cat-' + lr.category;
+
+    // MetCon exercises render differently — just a done/not-done toggle
+    if (lr.category === 'MetCon') {
+      const isDone = lr.sets[0] === true;
+      return `<div class="lift-card card ${isDone ? 'lift-done' : ''}" style="border-color:var(--danger);opacity:${isDone?'0.8':'1'};">
+        <div class="lift-header">
+          <div>
+            <div class="lift-name">
+              ${lr.name}
+              <span class="movement-ex-cat ${catClass}" style="margin-left:8px;font-size:11px;">METCON</span>
+            </div>
+            <div class="lift-warn deload-note" style="color:var(--muted);font-style:normal;">${lr.metconPrescription || lr.prescription}</div>
+          </div>
+          <div class="lift-weight-block">
+            <div class="lift-prescription">${lr.prescription}</div>
+          </div>
+        </div>
+        <div class="sets-row">
+          <button class="set-btn ${isDone ? 'done' : ''}" style="width:auto;padding:0 16px;"
+            onclick="toggleMetconDone(${idx})">${isDone ? '✓ DONE' : 'MARK DONE'}</button>
+        </div>
+      </div>`;
+    }
+
+    // Regular movement exercises
     const recordedSets = lr.sets.filter(s => s !== null);
     const allDone = recordedSets.length === lr.sets.length && recordedSets.every(v => v !== null);
-    const catClass = 'cat-' + lr.category;
 
     const setButtons = lr.sets.map((s, si) => {
       let cls = 'set-btn';
       let label = String(si + 1);
-      if (s === null) {
-        cls = 'set-btn';
-        label = String(si + 1);
-      } else if (s === 0) {
-        cls = 'set-btn fail';
-        label = '0';
-      } else if (s === lr.maxReps) {
-        cls = 'set-btn done';
-        label = String(s);
-      } else {
-        cls = 'set-btn partial';
-        label = String(s);
-      }
+      if (s === null) { cls = 'set-btn'; label = String(si + 1); }
+      else if (s === 0) { cls = 'set-btn fail'; label = '0'; }
+      else if (s === lr.maxReps) { cls = 'set-btn done'; label = String(s); }
+      else { cls = 'set-btn partial'; label = String(s); }
       return `<button class="${cls}" onclick="cycleMovementSet(${idx},${si})">${label}</button>`;
     }).join('');
 
@@ -1744,6 +1778,13 @@ window.renderMovementWorkout = function() {
       </div>
     </div>`;
   }).join('');
+};
+
+window.toggleMetconDone = function(liftIdx) {
+  const lr = currentSession.liftResults[liftIdx];
+  lr.sets[0] = lr.sets[0] === true ? null : true;
+  saveDraftSession();
+  renderMovementWorkout();
 };
 
 window.cycleMovementSet = function(liftIdx, setIdx) {
