@@ -58,6 +58,7 @@ export async function getSessions(userId, limit = 50) {
       workout_day,
       completed_at,
       session_lifts (
+        id,
         lift_id,
         lift_name,
         weight,
@@ -76,6 +77,16 @@ export async function getSessions(userId, limit = 50) {
     .limit(limit);
   if (error) throw error;
   return data;
+}
+
+// ── Edit historical session data ────────────────────────────────
+
+export async function updateSessionLift(id, updates) {
+  const { error } = await supabase
+    .from('session_lifts')
+    .update(updates)
+    .eq('id', id);
+  if (error) throw error;
 }
 
 export async function saveSession(userId, workoutDay, liftResults) {
@@ -249,7 +260,7 @@ export async function getMovementSessions(userId, limit = 50) {
     .select(`
       id, title, tagline, prompt_used, completed_at,
       movement_session_exercises (
-        name, category, weight, prescription, sets_json, sort_order
+        id, name, category, weight, prescription, sets_json, sort_order
       )
     `)
     .eq('user_id', userId)
@@ -257,4 +268,12 @@ export async function getMovementSessions(userId, limit = 50) {
     .limit(limit);
   if (error) throw error;
   return data || [];
+}
+
+export async function updateMovementSessionExercise(id, updates) {
+  const { error } = await supabase
+    .from('movement_session_exercises')
+    .update(updates)
+    .eq('id', id);
+  if (error) throw error;
 }
