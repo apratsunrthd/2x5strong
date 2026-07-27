@@ -1,0 +1,1109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>2x5 Strong</title>
+  <link rel="stylesheet" href="css/style.css">
+  <style>
+    /* ── App shell ─────────────────────────────────────── */
+    .main {
+      max-width: 680px;
+      margin: 0 auto;
+      padding: 24px 20px 80px;
+    }
+
+    /* ── Loading ──────────────────────────────────────── */
+    #app-loading {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: calc(100vh - 52px);
+      gap: 16px;
+      color: var(--muted);
+    }
+    .loading-brand {
+      font-family: var(--font-d);
+      font-size: 32px;
+      font-weight: 900;
+      letter-spacing: 1px;
+      color: var(--accent);
+    }
+    .loading-brand span { color: var(--muted); font-weight: 400; }
+
+    /* ── Nav user pill ────────────────────────────────── */
+    .user-pill {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 24px;
+      padding: 3px 12px 3px 3px;
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    /* ── Workout tab ──────────────────────────────────── */
+    .workout-header { margin-bottom: 24px; }
+    .workout-day-label {
+      font-family: var(--font-d);
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: var(--muted);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 6px;
+    }
+    .workout-day-label::before {
+      content: '';
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--accent);
+      display: inline-block;
+    }
+    .workout-title {
+      font-family: var(--font-d);
+      font-size: 44px;
+      font-weight: 900;
+      letter-spacing: 1px;
+      line-height: 1;
+    }
+    .workout-subtitle {
+      color: var(--muted);
+      font-size: 13px;
+      margin-top: 6px;
+    }
+
+    /* ── Lift cards ───────────────────────────────────── */
+    .lifts { display: flex; flex-direction: column; gap: 12px; margin-bottom: 24px; }
+
+    .lift-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px 20px;
+      transition: border-color 0.2s;
+    }
+    .lift-card.lift-done { border-color: var(--success); }
+    .lift-card.lift-fail { border-color: var(--danger); }
+
+    .lift-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      margin-bottom: 14px;
+      gap: 12px;
+    }
+    .lift-name {
+      font-family: var(--font-d);
+      font-size: 22px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      line-height: 1.2;
+    }
+    .lift-warn {
+      font-size: 12px;
+      color: var(--danger);
+      margin-top: 4px;
+      font-style: italic;
+    }
+    .deload-note { color: var(--info); }
+
+    .lift-weight-block { text-align: right; flex-shrink: 0; }
+    .lift-weight {
+      font-family: var(--font-d);
+      font-size: 38px;
+      font-weight: 900;
+      color: var(--accent);
+      line-height: 1;
+    }
+    .lift-weight span {
+      font-size: 18px;
+      font-weight: 500;
+      color: var(--accent-dim);
+      margin-left: 2px;
+    }
+    .lift-prescription {
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+
+    .sets-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .set-btn {
+      width: 42px; height: 42px;
+      border-radius: 8px;
+      border: 1.5px solid var(--border);
+      background: var(--surface2);
+      color: var(--muted);
+      font-family: var(--font-d);
+      font-size: 16px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.12s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .set-btn:hover:not(.done):not(.fail) { border-color: var(--accent); color: var(--accent); }
+    .set-btn.done { background: var(--success); border-color: var(--success); color: #000; }
+    .set-btn.fail { background: var(--danger); border-color: var(--danger); color: #fff; }
+    .set-btn.partial { background: var(--accent-bg); border-color: var(--accent-dim); color: var(--accent); }
+    .set-btn.locked { background: transparent; border-color: var(--border); color: var(--muted2); cursor: not-allowed; opacity: 0.4; }
+    .lift-card.lift-locked { border-color: var(--muted2); opacity: 0.75; }
+
+
+    /* ── Accessories ─────────────────────────────────── */
+    .accessories-section {
+      margin-top: 28px;
+      padding-top: 20px;
+      border-top: 1px solid var(--border);
+    }
+    .accessories-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 16px;
+    }
+    .accessories-title {
+      font-family: var(--font-d);
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+    }
+    .accessories-title span {
+      font-size: 13px;
+      font-weight: 400;
+      color: var(--muted);
+      margin-left: 8px;
+      font-family: var(--font-b);
+      letter-spacing: 0;
+    }
+    .add-accessory-btn {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 7px 14px;
+      color: var(--text);
+      font-family: var(--font-d);
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: border-color 0.12s;
+    }
+    .add-accessory-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+    .accessory-list { display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px; }
+
+    .accessory-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px 16px;
+    }
+    .accessory-card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 10px;
+    }
+    .accessory-name {
+      font-family: var(--font-d);
+      font-size: 18px;
+      font-weight: 700;
+    }
+    .accessory-type-badge {
+      font-family: var(--font-d);
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      padding: 2px 8px;
+      border-radius: 4px;
+    }
+    .type-standard { background: var(--surface2); color: var(--muted); }
+    .type-assisted { background: var(--info-bg); color: var(--info); }
+    .type-weighted { background: var(--accent-bg); color: var(--accent-dim); }
+
+    .accessory-remove {
+      background: none;
+      border: none;
+      color: var(--muted2);
+      cursor: pointer;
+      padding: 4px;
+      font-size: 16px;
+      line-height: 1;
+      transition: color 0.12s;
+    }
+    .accessory-remove:hover { color: var(--danger); }
+
+    .accessory-sets { display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px; }
+    .accessory-set-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+    }
+    .accessory-set-num {
+      font-family: var(--font-d);
+      font-weight: 700;
+      color: var(--muted2);
+      min-width: 24px;
+    }
+    .accessory-input {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 5px 8px;
+      color: var(--text);
+      font-size: 13px;
+      font-family: var(--font-b);
+      width: 64px;
+      outline: none;
+      text-align: center;
+    }
+    .accessory-input:focus { border-color: var(--accent); }
+    .accessory-input-label { color: var(--muted); font-size: 12px; min-width: 24px; }
+    .accessory-set-remove {
+      background: none;
+      border: none;
+      color: var(--muted2);
+      cursor: pointer;
+      font-size: 14px;
+      padding: 2px 4px;
+      margin-left: auto;
+    }
+    .accessory-set-remove:hover { color: var(--danger); }
+
+    .add-set-btn {
+      background: none;
+      border: 1px dashed var(--border);
+      border-radius: 6px;
+      padding: 5px 12px;
+      color: var(--muted);
+      font-size: 12px;
+      font-family: var(--font-d);
+      font-weight: 600;
+      letter-spacing: 0.5px;
+      cursor: pointer;
+      transition: border-color 0.12s, color 0.12s;
+      width: 100%;
+      text-align: center;
+    }
+    .add-set-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+    /* Suggestions strip */
+    .suggestions-strip {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-bottom: 12px;
+    }
+    .suggestion-chip {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 4px 12px;
+      font-size: 12px;
+      color: var(--muted);
+      cursor: pointer;
+      transition: border-color 0.12s, color 0.12s;
+      white-space: nowrap;
+    }
+    .suggestion-chip:hover { border-color: var(--accent); color: var(--accent); }
+    .suggestion-chip.suggested { border-color: var(--info); color: var(--info); }
+
+    /* Exercise picker modal */
+    .picker-modal {
+      background: var(--surface);
+      border: 1px solid var(--border2);
+      border-radius: var(--radius-lg);
+      padding: 0;
+      max-width: 440px;
+      width: 100%;
+      max-height: 85vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .picker-header {
+      padding: 20px 20px 0;
+      flex-shrink: 0;
+    }
+    .picker-header h2 {
+      font-size: 22px;
+      margin-bottom: 12px;
+    }
+    .picker-search {
+      width: 100%;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 9px 14px;
+      color: var(--text);
+      font-size: 14px;
+      font-family: var(--font-b);
+      outline: none;
+      margin-bottom: 12px;
+    }
+    .picker-search:focus { border-color: var(--accent); }
+    .picker-categories {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      padding-bottom: 12px;
+    }
+    .cat-btn {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 3px 12px;
+      font-size: 12px;
+      font-family: var(--font-d);
+      font-weight: 600;
+      letter-spacing: 0.3px;
+      color: var(--muted);
+      cursor: pointer;
+      transition: all 0.12s;
+    }
+    .cat-btn.active { background: var(--accent); border-color: var(--accent); color: #000; }
+    .picker-list {
+      overflow-y: auto;
+      flex: 1;
+      padding: 0 20px;
+    }
+    .picker-category-label {
+      font-family: var(--font-d);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: var(--muted2);
+      padding: 10px 0 6px;
+      position: sticky;
+      top: 0;
+      background: var(--surface);
+    }
+    .picker-exercise {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--border);
+      cursor: pointer;
+      transition: color 0.12s;
+    }
+    .picker-exercise:hover .picker-ex-name { color: var(--accent); }
+    .picker-ex-name { font-size: 14px; font-weight: 500; }
+    .picker-ex-type {
+      font-size: 11px;
+      font-family: var(--font-d);
+      font-weight: 600;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+    }
+    .picker-ex-type.type-assisted { color: var(--info); }
+    .picker-ex-type.type-weighted { color: var(--accent-dim); }
+    .picker-ex-type.type-standard { color: var(--muted2); }
+    .picker-footer {
+      padding: 16px 20px;
+      border-top: 1px solid var(--border);
+      flex-shrink: 0;
+      display: flex;
+      gap: 10px;
+    }
+
+    /* ── Movement day lock + prompt ─────────────────── */
+    .movement-lock-btn {
+      background: none;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 4px 8px;
+      cursor: pointer;
+      font-size: 14px;
+      color: var(--muted);
+      transition: border-color 0.12s;
+      flex-shrink: 0;
+    }
+    .movement-lock-btn:hover { border-color: var(--accent); }
+    .movement-lock-btn.locked { border-color: var(--accent); background: var(--accent-bg); }
+
+    .movement-prompt-section {
+      margin-top: 20px;
+      padding-top: 16px;
+      border-top: 1px solid var(--border);
+    }
+    .movement-prompt-toggle {
+      background: none;
+      border: none;
+      color: var(--muted2);
+      font-size: 12px;
+      cursor: pointer;
+      padding: 0;
+      font-family: var(--font-b);
+    }
+    .movement-prompt-toggle:hover { color: var(--muted); }
+    .movement-prompt-body { margin-top: 10px; }
+    .movement-prompt-text {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 12px;
+      font-size: 11px;
+      color: var(--muted);
+      white-space: pre-wrap;
+      word-break: break-word;
+      font-family: monospace;
+      line-height: 1.6;
+      max-height: 200px;
+      overflow-y: auto;
+    }
+
+    /* ── Movement day button ────────────────────────── */
+    .movement-day-btn {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: transparent;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 7px 12px;
+      color: var(--muted);
+      font-size: 12px;
+      font-family: var(--font-b);
+      cursor: pointer;
+      white-space: nowrap;
+      flex-shrink: 0;
+      transition: border-color 0.12s, color 0.12s;
+      margin-top: 4px;
+    }
+    .movement-day-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+    /* ── Movement day modal ──────────────────────────── */
+    .movement-modal {
+      background: var(--surface);
+      border: 1px solid var(--border2);
+      border-radius: var(--radius-lg);
+      padding: 0;
+      max-width: 440px;
+      width: 100%;
+      max-height: 88vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .movement-modal-header {
+      padding: 24px 24px 16px;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .movement-modal-header h2 { font-size: 26px; margin-bottom: 4px; }
+    .movement-tagline { color: var(--muted); font-size: 14px; font-style: italic; }
+    .movement-modal-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px 24px;
+    }
+    .movement-exercise {
+      padding: 14px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .movement-exercise:last-child { border-bottom: none; }
+    .movement-ex-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 4px;
+    }
+    .movement-ex-name {
+      font-family: var(--font-d);
+      font-size: 20px;
+      font-weight: 700;
+    }
+    .movement-ex-cat {
+      font-family: var(--font-d);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      padding: 2px 8px;
+      border-radius: 4px;
+    }
+    .cat-Push { background: var(--accent-bg); color: var(--accent-dim); }
+    .cat-Pull { background: var(--info-bg); color: var(--info); }
+    .cat-Hinge, .cat-Core { background: var(--success-bg); color: var(--success); }
+    .movement-ex-prescription {
+      font-family: var(--font-d);
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--accent);
+      margin-bottom: 4px;
+    }
+    .movement-ex-note { font-size: 13px; color: var(--muted); font-style: italic; }
+    .movement-modal-footer {
+      padding: 16px 24px;
+      border-top: 1px solid var(--border);
+      flex-shrink: 0;
+      display: flex;
+      gap: 10px;
+    }
+    .movement-loading {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 48px 24px;
+      gap: 16px;
+      color: var(--muted);
+    }
+    .movement-loading p { font-size: 14px; }
+
+    /* ── Warmup sets ─────────────────────────────────── */
+    .warmup-sets {
+      margin-bottom: 12px;
+      padding-bottom: 12px;
+      border-bottom: 1px dashed var(--border);
+    }
+    .warmup-label, .work-sets-label {
+      font-family: var(--font-d);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: var(--muted2);
+      margin-bottom: 8px;
+    }
+    .warmup-optional {
+      font-weight: 400;
+      letter-spacing: 0;
+      text-transform: none;
+      font-family: var(--font-b);
+      font-size: 11px;
+    }
+    .work-sets-label { margin-bottom: 8px; }
+    .warmup-rows { display: flex; flex-direction: column; gap: 4px; }
+    .warmup-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: transparent;
+      border: 1px solid transparent;
+      border-radius: var(--radius-sm);
+      padding: 6px 8px;
+      cursor: pointer;
+      width: 100%;
+      text-align: left;
+      transition: background 0.12s, border-color 0.12s;
+    }
+    .warmup-row:hover { background: var(--surface2); border-color: var(--border); }
+    .warmup-row.warmup-done { background: var(--success-bg); border-color: var(--success); }
+    .warmup-check {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      border: 1.5px solid var(--border2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--success);
+      flex-shrink: 0;
+      transition: border-color 0.12s, background 0.12s;
+    }
+    .warmup-done .warmup-check {
+      background: var(--success);
+      border-color: var(--success);
+      color: #000;
+    }
+    .warmup-weight {
+      font-family: var(--font-d);
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--muted);
+      min-width: 64px;
+    }
+    .warmup-done .warmup-weight { color: var(--text); }
+    .warmup-unit {
+      font-size: 12px;
+      font-weight: 400;
+      color: var(--muted2);
+      margin-left: 2px;
+    }
+    .warmup-reps {
+      font-size: 13px;
+      color: var(--muted2);
+    }
+    .warmup-done .warmup-reps { color: var(--muted); }
+    .sets-count {
+      font-size: 12px;
+      color: var(--muted);
+      margin-left: 4px;
+    }
+
+    /* ── Finish button ────────────────────────────────── */
+    .finish-btn {
+      width: 100%;
+      padding: 17px;
+      background: var(--accent);
+      color: #000;
+      border: none;
+      border-radius: var(--radius);
+      font-family: var(--font-d);
+      font-size: 20px;
+      font-weight: 900;
+      letter-spacing: 1px;
+      cursor: pointer;
+      transition: opacity 0.12s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+    }
+    .finish-btn:hover:not(:disabled) { opacity: 0.9; }
+    .finish-btn:disabled { opacity: 0.4; cursor: default; }
+
+    /* ── History tab ──────────────────────────────────── */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+    @media (max-width: 480px) {
+      .stats-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+    .stat-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 14px;
+    }
+    .stat-label {
+      font-family: var(--font-d);
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 4px;
+    }
+    .stat-val {
+      font-family: var(--font-d);
+      font-size: 28px;
+      font-weight: 900;
+    }
+
+    .history-list { display: flex; flex-direction: column; gap: 10px; }
+    .history-item { }
+    .history-meta {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+    .history-day {
+      font-family: var(--font-d);
+      font-size: 16px;
+      font-weight: 700;
+    }
+    .history-date {
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .history-lifts {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+    .h-lift {
+      font-size: 12px;
+      background: var(--surface2);
+      border-radius: 6px;
+      padding: 3px 9px;
+      color: var(--muted);
+    }
+    .h-lift.pass { color: var(--success); }
+    .h-lift.fail { color: var(--danger); }
+
+    /* ── Settings tab ─────────────────────────────────── */
+    .settings-section { margin-bottom: 28px; }
+    .settings-section-title {
+      font-family: var(--font-d);
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: var(--muted2);
+      margin-bottom: 4px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--border);
+    }
+    .settings-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .settings-row:last-child { border-bottom: none; }
+    .settings-label {
+      font-size: 14px;
+      font-weight: 500;
+    }
+
+    /* ── Section title ────────────────────────────────── */
+    .section-title {
+      font-family: var(--font-d);
+      font-size: 28px;
+      font-weight: 900;
+      letter-spacing: 1px;
+      margin-bottom: 16px;
+    }
+
+    /* ── Empty state ──────────────────────────────────── */
+    .empty-state {
+      text-align: center;
+      padding: 48px 20px;
+      color: var(--muted);
+    }
+    .empty-icon { font-size: 48px; margin-bottom: 16px; }
+    .empty-state h3 {
+      font-family: var(--font-d);
+      font-size: 22px;
+      color: var(--text);
+      margin-bottom: 8px;
+    }
+    .empty-state p {
+      font-size: 14px;
+      line-height: 1.6;
+      max-width: 280px;
+      margin: 0 auto;
+    }
+
+    .loading-msg {
+      text-align: center;
+      padding: 32px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    /* ── Timer ───────────────────────────────────────── */
+    .timer-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 12px 16px;
+      margin-bottom: 20px;
+      gap: 16px;
+    }
+    .timer-display { display: flex; align-items: center; gap: 20px; flex: 1; }
+    .timer-display.running .timer-total { color: var(--accent); }
+    .timer-block { display: flex; flex-direction: column; }
+    .timer-label {
+      font-family: var(--font-d);
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: var(--muted2);
+      margin-bottom: 2px;
+    }
+    .timer-value {
+      font-family: var(--font-d);
+      font-size: 28px;
+      font-weight: 900;
+      letter-spacing: 1px;
+      color: var(--muted);
+      line-height: 1;
+    }
+    #timer-rest-label { display: none; }
+    .timer-divider {
+      width: 1px;
+      height: 36px;
+      background: var(--border);
+    }
+    .timer-start-btn {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: var(--accent);
+      color: #000;
+      border: none;
+      border-radius: var(--radius-sm);
+      padding: 8px 14px;
+      font-family: var(--font-d);
+      font-size: 14px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .timer-start-btn svg { width: 14px; height: 14px; fill: currentColor; }
+  </style>
+</head>
+<body>
+
+<!-- Nav -->
+<nav class="nav">
+  <div class="nav-brand">2X5 <span>STRONG</span></div>
+  <div class="user-pill">
+    <div class="avatar avatar-sm" id="nav-avatar"></div>
+    <span id="nav-name" style="font-size:13px;color:var(--muted);"></span>
+  </div>
+</nav>
+
+<!-- Loading state -->
+<div id="app-loading">
+  <div class="loading-brand">2X5 <span>STRONG</span></div>
+  <span class="spinner" style="color:var(--accent);width:24px;height:24px;border-width:2.5px;"></span>
+</div>
+
+<!-- App content (hidden until loaded) -->
+<div id="app-content" style="display:none;">
+  <div class="main">
+
+    <!-- Workout Tab -->
+    <div class="tab-pane" id="tab-workout">
+      <div class="workout-header">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;">
+          <div>
+            <div class="workout-day-label" id="workout-day">WORKOUT A</div>
+            <div class="workout-title">TODAY'S SESSION</div>
+            <div class="workout-subtitle" id="workout-subtitle"></div>
+          </div>
+          <button class="movement-day-btn" onclick="openMovementDay()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+            Not feeling it?
+          </button>
+        </div>
+      </div>
+      <!-- Timer bar -->
+      <div class="timer-bar">
+        <div class="timer-display" id="timer-display">
+          <div class="timer-block">
+            <div class="timer-label">Session</div>
+            <div class="timer-value" id="timer-total">00:00</div>
+          </div>
+          <div class="timer-divider" id="timer-divider-rest"></div>
+          <div class="timer-block" id="timer-rest-label">
+            <div class="timer-label">Rest</div>
+            <div class="timer-value" id="timer-rest">00:00</div>
+          </div>
+        </div>
+        <button class="timer-start-btn" id="timer-start-btn" onclick="startTimer()">
+          <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+          START
+        </button>
+      </div>
+
+      <div class="lifts" id="lifts-container"></div>
+      <!-- Accessory Work -->
+      <div class="accessories-section">
+        <div class="accessories-header">
+          <div class="accessories-title">
+            ACCESSORIES <span>optional</span>
+          </div>
+          <button class="add-accessory-btn" onclick="openExercisePicker()">
+            + ADD
+          </button>
+        </div>
+        <div class="suggestions-strip" id="accessory-suggestions"></div>
+        <div class="accessory-list" id="accessory-list"></div>
+      </div>
+
+      <button class="finish-btn" id="finish-btn" onclick="openFinishModal()" disabled>
+        FINISH WORKOUT
+      </button>
+    </div>
+
+    <!-- History Tab -->
+    <div class="tab-pane" id="tab-history" style="display:none;">
+      <div class="section-title">HISTORY</div>
+      <div id="history-container"></div>
+    </div>
+
+    <!-- Settings Tab -->
+    <div class="tab-pane" id="tab-settings" style="display:none;">
+      <div class="section-title">SETTINGS</div>
+      <div id="settings-container"></div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Bottom nav -->
+<div class="bottom-nav" id="bottom-nav">
+  <div class="bottom-nav-inner">
+    <button class="bnav-btn active" id="bnav-workout" onclick="showTab('workout')">
+      <svg viewBox="0 0 24 24"><path d="M6.5 6.5h11M6.5 17.5h11M4 12h16M7 9l-1-2.5M17 9l1-2.5M7 15l-1 2.5M17 15l1 2.5"/></svg>
+      WORKOUT
+    </button>
+    <button class="bnav-btn" id="bnav-history" onclick="showTab('history')">
+      <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+      HISTORY
+    </button>
+    <button class="bnav-btn" id="bnav-settings" onclick="showTab('settings')">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+      SETTINGS
+    </button>
+  </div>
+</div>
+
+<!-- Finish Workout Modal -->
+<div class="modal-overlay" id="finish-modal">
+  <div class="modal-box">
+    <h2 id="modal-title">SAVE SESSION?</h2>
+    <p id="modal-body"></p>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeFinishModal()">CANCEL</button>
+      <button class="btn btn-primary" onclick="confirmFinish()">SAVE</button>
+    </div>
+  </div>
+</div>
+
+<!-- Movement Day Modal -->
+<div class="modal-overlay" id="movement-modal">
+  <div class="movement-modal">
+    <div class="movement-modal-header">
+      <h2 id="movement-modal-title">MOVEMENT DAY</h2>
+      <div class="movement-tagline" id="movement-tagline"></div>
+    </div>
+    <div class="movement-modal-body" id="movement-modal-body">
+      <div class="movement-loading">
+        <span class="spinner" style="width:28px;height:28px;border-width:3px;color:var(--accent);"></span>
+        <p>Generating your workout…</p>
+      </div>
+    </div>
+    <div class="movement-modal-footer">
+      <button class="btn btn-ghost btn-full" onclick="closeMovementDay()">CANCEL</button>
+      <button class="btn btn-ghost btn-full" id="movement-reroll-btn" onclick="rerollMovementDay()" style="display:none;">REROLL</button>
+      <button class="btn btn-primary btn-full" id="movement-do-it-btn" onclick="doMovementDay()" style="display:none;">DO THIS WORKOUT</button>
+    </div>
+  </div>
+</div>
+
+<!-- Exercise Picker Modal -->
+<div class="modal-overlay" id="exercise-picker-modal">
+  <div class="picker-modal">
+    <div class="picker-header">
+      <h2>ADD EXERCISE</h2>
+      <input class="picker-search" id="picker-search" placeholder="Search exercises…" oninput="filterPicker()">
+      <div class="picker-categories" id="picker-categories"></div>
+    </div>
+    <div class="picker-list" id="picker-list"></div>
+    <div class="picker-footer">
+      <button class="btn btn-ghost btn-full" onclick="closeExercisePicker()">CANCEL</button>
+      <button class="btn btn-ghost btn-full" onclick="openAddCustomExercise()">+ CUSTOM</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add Custom Exercise Modal -->
+<div class="modal-overlay" id="custom-exercise-modal">
+  <div class="modal-box">
+    <h2>CUSTOM EXERCISE</h2>
+    <div class="form-group">
+      <label class="form-label">Name</label>
+      <input class="form-input" id="custom-ex-name" placeholder="e.g. Nordic Curls" maxlength="50">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Category</label>
+      <select class="form-input" id="custom-ex-category">
+        <option value="Core">Core</option>
+        <option value="Pull">Pull</option>
+        <option value="Push">Push</option>
+        <option value="Legs">Legs</option>
+        <option value="Arms">Arms</option>
+        <option value="Other">Other</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Type</label>
+      <select class="form-input" id="custom-ex-type">
+        <option value="standard">Standard (weight or bodyweight)</option>
+        <option value="assisted">Assisted (e.g. band-assisted pull-ups)</option>
+        <option value="weighted">Weighted bodyweight (e.g. weighted dips)</option>
+      </select>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeCustomExercise()">CANCEL</button>
+      <button class="btn btn-primary" onclick="saveCustomExercise()">ADD</button>
+    </div>
+  </div>
+</div>
+
+<!-- Timing Warning Modal -->
+<div class="modal-overlay" id="timing-modal">
+  <div class="modal-box">
+    <h2 id="timing-modal-title"></h2>
+    <p id="timing-modal-body"></p>
+    <div class="modal-actions">
+      <button class="btn" id="timing-modal-cancel" onclick="timingModalCancel()">WAIT</button>
+      <button class="btn" id="timing-modal-confirm" onclick="timingModalConfirm()">PROCEED</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div id="toast" class="toast"></div>
+
+<script>
+// Stub all onclick functions so they queue if the module hasn't loaded yet
+(function() {
+  const fns = [
+    'showTab','startTimer','openFinishModal','closeFinishModal','confirmFinish',
+    'timingModalConfirm','timingModalCancel','openMovementDay','closeMovementDay',
+    'doMovementDay','renderMovementWorkout','toggleMovementSet',
+    'openExercisePicker','closeExercisePicker','openAddCustomExercise',
+    'closeCustomExercise','saveCustomExercise','setPickerCategory','filterPicker',
+    'cycleSet','toggleWarmup','editLiftWeight','addSuggestedAccessory',
+    'cycleMovementSet','toggleMovementLock','rerollMovementDay','toggleMovementPrompt','editMovementWeight',
+    'addAccessoryFromPicker','removeAccessory','addAccessorySet',
+    'removeAccessorySet','updateAccessorySet','editLift','editName',
+    'toggleDay','editMinIncrement','handleSignOut'
+  ];
+  const queue = {};
+  fns.forEach(fn => {
+    queue[fn] = [];
+    window[fn] = function(...args) {
+      // If the real function has been assigned, call it
+      if (window['_real_' + fn]) return window['_real_' + fn](...args);
+      queue[fn].push(args);
+    };
+  });
+  // After module loads, real functions replace stubs via window.X = ...
+  // We intercept that assignment to flush the queue
+  fns.forEach(fn => {
+    Object.defineProperty(window, fn, {
+      set(realFn) {
+        window['_real_' + fn] = realFn;
+        // Flush any queued calls
+        (queue[fn] || []).forEach(args => realFn(...args));
+        queue[fn] = [];
+      },
+      get() { return window['_real_' + fn] || function() {}; },
+      configurable: true,
+    });
+  });
+})();
+</script>
+<script type="module" src="js/app.js"></script>
+
+</body>
+</html>
