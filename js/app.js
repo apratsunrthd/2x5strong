@@ -1396,12 +1396,13 @@ function cycleMovementRep(current, maxReps) {
 }
 
 // Build the prompt, used both for generation and "show prompt"
-function buildMovementPrompt(weights, recentSummary, minIncrement, lockedExercises, daysSinceLast) {
+function buildMovementPrompt(weights, recentSummary, minIncrement, lockedExercises, daysSinceLast, includeMetcon) {
   const lockedNames = lockedExercises.map(e => e.name);
   const lockedCategories = lockedExercises.map(e => e.category);
 
-  const needed = ['Push', 'Pull', 'Hinge'].filter(c => !lockedCategories.includes(c));
-  const remainingCount = Math.max(needed.length, 3 - lockedExercises.length);
+  // Full required categories: Push, Pull, Hinge, Core
+  const needed = ['Push', 'Pull', 'Hinge', 'Core'].filter(c => !lockedCategories.includes(c));
+  const remainingCount = Math.max(needed.length, 4 - lockedExercises.length);
 
   const lockedSection = lockedNames.length > 0
     ? 'LOCKED (do NOT duplicate or replace): ' + lockedNames.map((n,i) => n + ' [' + lockedExercises[i].category + ']').join(', ') + '.'
@@ -1421,6 +1422,9 @@ function buildMovementPrompt(weights, recentSummary, minIncrement, lockedExercis
     }
   }
 
+  const metconSection = includeMetcon ? `
+Also generate ONE MetCon/cardio finisher. This is a short conditioning piece (5-12 minutes) appropriate for someone who has access to dumbbells, kettlebells, and a pull-up bar. Use AMRAP, rounds for time, or EMOM format. If they cannot do the movement, suggest a substitution. Add it as the last exercise in the array with category "MetCon" and use the prescription field for the time/format description instead of sets/reps.` : '';
+
   return `You are a strength and conditioning coach designing a movement day workout for an athlete who trains 2 days per week with barbell strength work and does cycling, running, and swimming on other days.
 
 The athlete is having a low-energy day. Current working weights:
@@ -1435,8 +1439,9 @@ Recent sessions: ${recentSummary || 'No recent data'}.
 Minimum weight increment: ${minIncrement}lb.
 ${lockedSection}
 ${neededSection}
+${metconSection}
 
-Generate exactly ${remainingCount} NEW exercise${remainingCount !== 1 ? 's' : ''}. STRICT RULES:
+Generate exactly ${remainingCount} NEW exercise${remainingCount !== 1 ? 's' : ''} (not counting any MetCon). STRICT RULES:
 1. NEVER repeat any exercise name from the locked list or from your own new exercises
 2. Cover each needed category exactly once — no doubling up on any category
 3. Loads at 40-60% of working weights, or light dumbbell/kettlebell alternatives
@@ -1450,19 +1455,21 @@ Respond ONLY with valid JSON, no preamble, no markdown fences:
   "exercises": [
     {
       "name": "Exercise Name",
-      "category": "Push|Pull|Hinge|Core",
+      "category": "Push|Pull|Hinge|Core|MetCon",
       "sets": 3,
       "reps": "10-12",
       "weight": 95,
       "bodyweight": false,
-      "note": "one-line coaching cue"
+      "note": "one-line coaching cue",
+      "metconPrescription": null
     }
   ]
 }
 
+For MetCon: set category to "MetCon", sets to 1, reps to the time/format (e.g. "10 min AMRAP"), weight to 0, bodyweight to true, and metconPrescription to the full description of the workout.
+For all other exercises: set metconPrescription to null.
 If bodyweight set bodyweight to true and weight to 0. Round all weights to nearest ${minIncrement}lb.`;
 }
-
 // Core fetch function — fetches only the non-locked exercises
 async function fetchMovementWorkout(lockedExercises) {
   const settings = getGlobalSettings();
