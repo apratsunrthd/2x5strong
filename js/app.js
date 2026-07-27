@@ -245,7 +245,7 @@ async function checkSessionTiming() {
       const dayWord = Math.round(daysSince) === 1 ? 'day' : 'days';
       showTimingModal({
         title: '📅 BEEN A WHILE',
-        body: `It has been ${Math.round(daysSince)} ${dayWord} since your last session. Your body may need time to readjust — consider a deload: drop all weights to 90% for this session to ease back in and avoid injury. Or tap "Not feeling it?" for a lighter movement day instead.`,
+        body: `It has been ${Math.round(daysSince)} ${dayWord} since your last session. Your body may need time to readjust — consider a deload: drop all weights to 90% for this session to ease back in and avoid injury. Or tap "MOVE" for a lighter session instead.`,
         confirmLabel: 'DELOAD THIS SESSION',
         confirmStyle: 'background: var(--info); color: #fff;',
         cancelLabel: 'LIFT FULL WEIGHT',
