@@ -1608,23 +1608,29 @@ window.rerollMovementDay = async function() {
   try {
     const newWorkout = await fetchMovementWorkout(lockedList);
 
-    // Merge: locked exercises keep their positions, new ones fill the rest
-    const merged = { ...newWorkout };
-    const newExercises = [...newWorkout.exercises];
+    // Build final exercise list: locked exercises in their original positions,
+    // new exercises filling the remaining slots in order
     const lockedIndices = Object.keys(movementLockedExercises).map(Number).sort();
+    const newExercises = [...newWorkout.exercises]; // only the newly generated ones
+    const finalExercises = [];
+    let newIdx = 0;
 
-    // Re-insert locked exercises at their original positions
-    lockedIndices.forEach(idx => {
-      newExercises.splice(idx, 0, movementLockedExercises[idx]);
-    });
-    merged.exercises = newExercises.slice(0, Math.max(4, newExercises.length));
+    // Reconstruct: for each slot, use locked if available, otherwise take next new exercise
+    const totalSlots = lockedList.length + newExercises.length;
+    for (let i = 0; i < totalSlots; i++) {
+      if (movementLockedExercises[i]) {
+        finalExercises.push(movementLockedExercises[i]);
+      } else {
+        if (newIdx < newExercises.length) {
+          finalExercises.push(newExercises[newIdx++]);
+        }
+      }
+    }
+
+    const merged = { ...newWorkout, exercises: finalExercises };
     movementDayWorkout = merged;
 
-    // Rebuild lock map based on new positions
-    const newLocked = {};
-    lockedIndices.forEach(idx => { newLocked[idx] = movementLockedExercises[idx]; });
-    movementLockedExercises = newLocked;
-
+    // Lock map stays the same — indices don't change
     renderMovementModal(merged, movementLockedExercises);
   } catch(e) {
     toast('Reroll failed — try again', 'error');
