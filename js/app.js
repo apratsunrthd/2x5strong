@@ -1396,33 +1396,52 @@ function cycleMovementRep(current, maxReps) {
 }
 
 // Build the prompt, used both for generation and "show prompt"
-function buildMovementPrompt(weights, recentSummary, minIncrement, lockedExercises) {
+function buildMovementPrompt(weights, recentSummary, minIncrement, lockedExercises, daysSinceLast) {
   const lockedNames = lockedExercises.map(e => e.name);
+  const lockedCategories = lockedExercises.map(e => e.category);
+
+  const needed = ['Push', 'Pull', 'Hinge'].filter(c => !lockedCategories.includes(c));
+  const remainingCount = Math.max(needed.length, 3 - lockedExercises.length);
+
   const lockedSection = lockedNames.length > 0
-    ? `The following exercises are already locked in and MUST NOT be replaced or duplicated: ${lockedNames.join(', ')}.`
+    ? 'LOCKED (do NOT duplicate or replace): ' + lockedNames.map((n,i) => n + ' [' + lockedExercises[i].category + ']').join(', ') + '.'
     : '';
-  const remainingCount = 3 - lockedExercises.length;
 
-  return `You are a strength and conditioning coach designing a "movement day" workout for an athlete who trains 2 days per week with barbell strength work and does cycling, running, and swimming on other days.
+  const neededSection = needed.length > 0
+    ? 'New exercises MUST cover these categories (one each, no more): ' + needed.join(', ') + '.'
+    : 'All required categories covered by locked exercises. Pick complementary movements.';
 
-The athlete is having a low-energy day and needs a lighter session. Their current working weights are:
+  let daysNote = 'No previous session data.';
+  if (daysSinceLast != null) {
+    if (daysSinceLast === 0) {
+      daysNote = 'They trained earlier today.';
+    } else {
+      const d = Math.round(daysSinceLast);
+      daysNote = `Their last session was ${d} day${d !== 1 ? 's' : ''} ago — the weights above are from that session.`;
+    }
+  }
+
+  return `You are a strength and conditioning coach designing a movement day workout for an athlete who trains 2 days per week with barbell strength work and does cycling, running, and swimming on other days.
+
+The athlete is having a low-energy day. Current working weights:
 - Squat: ${weights.squat}lb
 - Bench Press: ${weights.bench}lb
 - Barbell Row: ${weights.row}lb
 - Overhead Press: ${weights.press}lb
 - Deadlift: ${weights.deadlift}lb
 
-Their minimum weight increment is ${minIncrement}lb.
+${daysNote}
 Recent sessions: ${recentSummary || 'No recent data'}.
+Minimum weight increment: ${minIncrement}lb.
 ${lockedSection}
+${neededSection}
 
-Generate exactly ${remainingCount} exercise${remainingCount !== 1 ? 's' : ''} to complement the locked ones. Together the full workout must include at least one PUSH, one PULL, and one HIP HINGE. Design accordingly.
-
-Rules:
-1. Loads should be 40-60% of their working weights, or bodyweight/light dumbbell/kettlebell alternatives
-2. Rep scheme should be higher reps given as a range like "10-12" — this is about moving well, not grinding
-3. May use barbells, dumbbells, kettlebells, or bodyweight
-4. For each exercise include: name, sets, reps (as a range string e.g. "10-12"), suggested weight, and a one-line coaching note
+Generate exactly ${remainingCount} NEW exercise${remainingCount !== 1 ? 's' : ''}. STRICT RULES:
+1. NEVER repeat any exercise name from the locked list or from your own new exercises
+2. Cover each needed category exactly once — no doubling up on any category
+3. Loads at 40-60% of working weights, or light dumbbell/kettlebell alternatives
+4. Rep scheme as a range like "10-12" — movement quality over load today
+5. One coaching note per exercise
 
 Respond ONLY with valid JSON, no preamble, no markdown fences:
 {
@@ -1441,7 +1460,7 @@ Respond ONLY with valid JSON, no preamble, no markdown fences:
   ]
 }
 
-If bodyweight, set bodyweight to true and weight to 0. Round weights to nearest ${minIncrement}lb.`;
+If bodyweight set bodyweight to true and weight to 0. Round all weights to nearest ${minIncrement}lb.`;
 }
 
 // Core fetch function — fetches only the non-locked exercises
@@ -1453,6 +1472,13 @@ async function fetchMovementWorkout(lockedExercises) {
     s.workout_day + ': ' + s.session_lifts.map(l => l.lift_name + ' ' + l.weight + 'lb ' + l.sets_passed + '/5').join(', ')
   ).join(' | ');
 
+  // Calculate days since last session for prompt context
+  let daysSinceLast = null;
+  if (recent.length > 0) {
+    const lastDate = new Date(recent[0].completed_at);
+    daysSinceLast = (Date.now() - lastDate) / (1000 * 60 * 60 * 24);
+  }
+
   const weights = {
     squat:    liftStates.squat?.weight    ?? 45,
     bench:    liftStates.bench?.weight    ?? 45,
@@ -1461,7 +1487,7 @@ async function fetchMovementWorkout(lockedExercises) {
     deadlift: liftStates.deadlift?.weight ?? 45,
   };
 
-  lastMovementPrompt = buildMovementPrompt(weights, recentSummary, settings.minIncrement, lockedExercises);
+  lastMovementPrompt = buildMovementPrompt(weights, recentSummary, settings.minIncrement, lockedExercises, daysSinceLast);
 
   const { data: { session: authSession } } = await supabase.auth.getSession();
   const resp = await fetch(`${SUPABASE_FUNCTIONS_URL}/generate-movement-workout`, {
