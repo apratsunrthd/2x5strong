@@ -23,8 +23,13 @@
       color: var(--accent);
       margin-bottom: 6px;
       text-align: center;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
     }
     .auth-logo span { color: var(--muted); font-weight: 400; }
+    .auth-logo-icon { flex-shrink: 0; }
 
     .auth-tagline {
       color: var(--muted);
@@ -157,7 +162,16 @@
 <body>
 
 <div class="auth-page">
-  <div class="auth-logo">2X5 <span>STRONG</span></div>
+  <div class="auth-logo"><svg class="auth-logo-icon" viewBox="0 0 200 200" width="52" height="52">
+    <path d="M40 70 Q15 55 8 30 Q6 22 12 20 Q20 18 24 28 Q30 45 48 62 Z" fill="#e8d44d"/>
+    <path d="M160 70 Q185 55 192 30 Q194 22 188 20 Q180 18 176 28 Q170 45 152 62 Z" fill="#e8d44d"/>
+    <path d="M100 55 C 60 55, 35 80, 32 115 C 30 145, 45 168, 65 178 L 75 182 C 85 186, 115 186, 125 182 L 135 178 C 155 168, 170 145, 168 115 C 165 80, 140 55, 100 55 Z" fill="#e8d44d"/>
+    <ellipse cx="72" cy="105" rx="7" ry="9" fill="#171717"/>
+    <ellipse cx="128" cy="105" rx="7" ry="9" fill="#171717"/>
+    <path d="M65 145 C 65 130, 78 122, 100 122 C 122 122, 135 130, 135 145 C 135 168, 118 180, 100 180 C 82 180, 65 168, 65 145 Z" fill="#171717" opacity="0.15"/>
+    <ellipse cx="85" cy="158" rx="6" ry="9" fill="#171717"/>
+    <ellipse cx="115" cy="158" rx="6" ry="9" fill="#171717"/>
+  </svg><div>2X5 <span>STRONG</span></div></div>
   <p class="auth-tagline">Two days lifting. Four days moving. Strength built around your full life.</p>
 
   <div class="auth-box">
