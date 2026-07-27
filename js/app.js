@@ -22,6 +22,7 @@ const WORKOUT_B = [
 // ── App State ─────────────────────────────────────────────────
 
 let user = null;
+let historySessionCache = {}; // sessionId -> full session object, for edit modal
 let profile = null;
 let liftStates = null;
 let personalRecords = null;
@@ -777,6 +778,7 @@ window.showTab = function(name) {
 window.renderHistory = async function() {
   const container = document.getElementById('history-container');
   container.innerHTML = '<div class="loading-msg">Loading history…</div>';
+  historySessionCache = {}; // reset cache on each render
 
   try {
     const { getSessions, getCustomExercises, getMovementSessions } = await import('./db.js');
@@ -851,6 +853,8 @@ window.renderHistory = async function() {
             return `<span class="h-lift" style="color:var(--info);">${ex.name} ${ex.weight > 0 ? ex.weight+'lb' : 'BW'} ${totalReps}r${volStr}</span>`;
           }).join('');
 
+        historySessionCache[s.id] = s; // stash for edit modal lookup
+
         list.insertAdjacentHTML('beforeend', `
           <div class="history-item card card-sm">
             <div class="history-meta">
@@ -858,7 +862,10 @@ window.renderHistory = async function() {
                 <span class="history-day">${s.title || 'Movement Day'}</span>
                 <span class="badge badge-info" style="font-size:10px;">MOVEMENT</span>
               </div>
-              <div class="history-date">${new Date(s.completed_at).toLocaleDateString('en-US', { weekday:'short', month:'short', day:'numeric' })}</div>
+              <div style="display:flex;align-items:center;gap:8px;">
+                <button class="btn btn-ghost btn-sm" style="padding:4px 10px;font-size:11px;" onclick="openEditHistory('${s.id}','movement')">EDIT</button>
+                <div class="history-date">${new Date(s.completed_at).toLocaleDateString('en-US', { weekday:'short', month:'short', day:'numeric' })}</div>
+              </div>
             </div>
             <div class="history-lifts">${exHtml}</div>
             ${s.tagline ? `<div style="font-size:12px;color:var(--muted);font-style:italic;margin-top:6px;">"${s.tagline}"</div>` : ''}
@@ -912,13 +919,18 @@ window.renderHistory = async function() {
           }).filter(Boolean).join('')
         + '</div>';
 
+      historySessionCache[s.id] = s; // stash for edit modal lookup
+
       list.insertAdjacentHTML('beforeend', `
         <div class="history-item card card-sm">
           <div class="history-meta">
             <span class="history-day">Workout ${s.workout_day}</span>
-            <div style="text-align:right;">
-              <div class="history-date">${dateStr}</div>
-              ${sessionVolume > 0 ? `<div style="font-size:11px;color:var(--muted2);">${Math.round(sessionVolume).toLocaleString()} lb total</div>` : ''}
+            <div style="display:flex;align-items:center;gap:8px;">
+              <button class="btn btn-ghost btn-sm" style="padding:4px 10px;font-size:11px;" onclick="openEditHistory('${s.id}','strength')">EDIT</button>
+              <div style="text-align:right;">
+                <div class="history-date">${dateStr}</div>
+                ${sessionVolume > 0 ? `<div style="font-size:11px;color:var(--muted2);">${Math.round(sessionVolume).toLocaleString()} lb total</div>` : ''}
+              </div>
             </div>
           </div>
           <div class="history-lifts">${liftsHtml}</div>
@@ -1234,6 +1246,111 @@ window.buildIncrementRows = function() {
       + '</div>';
   }).join('');
 }
+
+// ── Edit History ─────────────────────────────────────────────
+
+let editingSessionId = null;
+let editingSessionType = null; // 'strength' | 'movement'
+let editingDraft = null; // working copy of lifts/exercises being edited
+
+window.openEditHistory = function(sessionId, type) {
+  const session = historySessionCache[sessionId];
+  if (!session) { toast('Session data not found', 'error'); return; }
+
+  editingSessionId = sessionId;
+  editingSessionType = type;
+
+  const items = type === 'movement'
+    ? (session.movement_session_exercises || []).slice().sort((a,b) => a.sort_order - b.sort_order)
+    : (session.session_lifts || []);
+
+  // Deep copy into working draft
+  editingDraft = items.map(item => ({
+    id: item.id,
+    name: type === 'movement' ? item.name : item.lift_name,
+    weight: item.weight,
+    sets: [...(item.sets_json || [])],
+  }));
+
+  renderEditHistoryBody();
+  document.getElementById('edit-history-modal').classList.add('open');
+};
+
+function renderEditHistoryBody() {
+  const body = document.getElementById('edit-history-body');
+  body.innerHTML = editingDraft.map((item, idx) => {
+    const setsHtml = item.sets.map((s, si) => {
+      const displayVal = (s === null || s === 'locked') ? '' : s;
+      return `<div class="edit-set-cell">
+        <label>Set ${si+1}</label>
+        <input class="accessory-input" type="number" min="0" max="15" style="width:48px;"
+          value="${displayVal}" onchange="updateEditSet(${idx},${si},this.value)">
+      </div>`;
+    }).join('');
+
+    return `<div class="edit-lift-block">
+      <div class="edit-lift-name">${item.name}</div>
+      <div class="edit-weight-row">
+        <label>Weight</label>
+        <input class="accessory-input" type="number" min="0" style="width:70px;"
+          value="${item.weight}" onchange="updateEditWeight(${idx},this.value)">
+        <span style="font-size:12px;color:var(--muted);">lb</span>
+      </div>
+      <div class="edit-sets-grid">${setsHtml}</div>
+    </div>`;
+  }).join('');
+}
+
+window.updateEditSet = function(itemIdx, setIdx, value) {
+  const val = value === '' ? null : Math.max(0, Math.min(15, parseInt(value) || 0));
+  editingDraft[itemIdx].sets[setIdx] = val;
+};
+
+window.updateEditWeight = function(itemIdx, value) {
+  const val = parseFloat(value);
+  if (!isNaN(val) && val >= 0) editingDraft[itemIdx].weight = val;
+};
+
+window.closeEditHistory = function() {
+  document.getElementById('edit-history-modal').classList.remove('open');
+  editingSessionId = null;
+  editingSessionType = null;
+  editingDraft = null;
+};
+
+window.saveEditHistory = async function() {
+  if (!editingDraft) return;
+
+  try {
+    const { updateSessionLift, updateMovementSessionExercise } = await import('./db.js');
+
+    for (const item of editingDraft) {
+      const recordedSets = item.sets.filter(s => s !== null && s !== 'locked');
+      const setsPassed = recordedSets.filter(s => s === 5).length;
+
+      if (editingSessionType === 'movement') {
+        await updateMovementSessionExercise(item.id, {
+          weight: item.weight,
+          sets_json: item.sets,
+        });
+      } else {
+        await updateSessionLift(item.id, {
+          weight: item.weight,
+          sets_json: item.sets,
+          sets_passed: setsPassed,
+        });
+      }
+    }
+
+    toast('Session updated', 'success');
+    closeEditHistory();
+    renderHistory(); // refresh the list to show corrected data
+
+  } catch (e) {
+    console.error('Edit save error:', e);
+    toast('Failed to save changes', 'error');
+  }
+};
 
 window.renderSettings = function() {
   const container = document.getElementById('settings-container');
