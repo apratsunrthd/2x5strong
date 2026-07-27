@@ -1627,7 +1627,11 @@ window.rerollMovementDay = async function() {
     // Build final exercise list: locked exercises in their original positions,
     // new exercises filling the remaining slots in order
     const lockedIndices = Object.keys(movementLockedExercises).map(Number).sort();
-    const newExercises = [...newWorkout.exercises]; // only the newly generated ones
+    // Safety net: remove any exercises Claude generated that duplicate locked names
+    const lockedNameSet = new Set(lockedList.map(e => e.name.toLowerCase()));
+    const newExercises = newWorkout.exercises.filter(
+      ex => !lockedNameSet.has(ex.name.toLowerCase())
+    );
     const finalExercises = [];
     let newIdx = 0;
 
