@@ -1,0 +1,9 @@
+# Supabase local dev
+.supabase/
+
+# macOS
+.DS_Store
+
+# Editor
+.vscode/
+.idea/
