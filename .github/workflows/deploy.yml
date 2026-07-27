@@ -17,9 +17,7 @@ jobs:
           version: latest
 
       - name: Run migrations
-        run: |
-          supabase db push \
-            --db-url "postgresql://postgres:${{ secrets.SUPABASE_DB_PASSWORD }}@db.${{ secrets.SUPABASE_PROJECT_REF }}.supabase.co:5432/postgres"
+        run: supabase db push --db-url "${{ secrets.SUPABASE_DB_URL }}"
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
 
@@ -35,9 +33,7 @@ jobs:
           version: latest
 
       - name: Deploy edge functions
-        run: |
-          supabase functions deploy generate-movement-workout \
-            --project-ref ${{ secrets.SUPABASE_PROJECT_REF }}
+        run: supabase functions deploy generate-movement-workout --project-ref ${{ secrets.SUPABASE_PROJECT_REF }}
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
 
