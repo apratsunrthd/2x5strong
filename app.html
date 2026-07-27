@@ -543,6 +543,33 @@
     }
     .cat-Push { background: var(--accent-bg); color: var(--accent-dim); }
     .cat-MetCon { background: rgba(224,82,82,0.1); color: var(--danger); }
+
+    .metcon-move-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      overflow: hidden;
+      margin-top: 4px;
+    }
+    .metcon-move-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 12px;
+      border-bottom: 1px solid var(--border);
+      font-size: 13px;
+    }
+    .metcon-move-row:last-child { border-bottom: none; }
+    .metcon-move-row:nth-child(odd) { background: var(--surface2); }
+    .metcon-move-name { color: var(--text); font-weight: 500; }
+    .metcon-move-reps {
+      font-family: var(--font-d);
+      font-weight: 700;
+      color: var(--danger);
+      font-size: 14px;
+    }
     .cat-Pull { background: var(--info-bg); color: var(--info); }
     .cat-Hinge, .cat-Core { background: var(--success-bg); color: var(--success); }
     .movement-ex-prescription {

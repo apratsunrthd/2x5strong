@@ -662,13 +662,22 @@ window.confirmFinish = async function() {
         title: movementDayWorkout?.title || 'Movement Day',
         tagline: movementDayWorkout?.tagline || '',
         promptUsed: lastMovementPrompt,
-        exercises: currentSession.liftResults.map(lr => ({
-          name: lr.name,
-          category: lr.category,
-          weight: lr.weight,
-          prescription: lr.prescription,
-          sets: lr.sets,
-        })),
+        exercises: currentSession.liftResults.map(lr => {
+          // For MetCon, bake the structured details into a readable prescription string for storage
+          let prescription = lr.prescription;
+          if (lr.category === 'MetCon' && lr.metconDetails) {
+            const d = lr.metconDetails;
+            const moves = (d.movements || []).map(m => m.movement + ' x' + m.reps).join(', ');
+            prescription = (d.format || '') + ' ' + (d.duration || '') + ': ' + moves;
+          }
+          return {
+            name: lr.name,
+            category: lr.category,
+            weight: lr.weight,
+            prescription,
+            sets: lr.sets,
+          };
+        }),
       });
     } else {
       // Save to sessions + session_lifts (normal path)
@@ -1566,6 +1575,30 @@ function renderMovementModal(workout, locked) {
 
   const exercisesHtml = allExercises.map((ex, i) => {
     const isLocked = !!locked[i];
+    const isMetcon = ex.category === 'MetCon';
+
+    if (isMetcon && ex.metconDetails) {
+      const d = ex.metconDetails;
+      const movementRows = (d.movements || []).map(m =>
+        `<div class="metcon-move-row"><span class="metcon-move-name">${m.movement}</span><span class="metcon-move-reps">${m.reps}</span></div>`
+      ).join('');
+      return `<div class="movement-exercise" id="movement-ex-${i}">
+        <div class="movement-ex-header">
+          <div style="display:flex;align-items:center;gap:8px;flex:1;">
+            <span class="movement-ex-name">${ex.name}</span>
+            <span class="movement-ex-cat cat-MetCon">METCON</span>
+          </div>
+          <button class="movement-lock-btn ${isLocked ? 'locked' : ''}"
+                  onclick="toggleMovementLock(${i})"
+                  title="${isLocked ? 'Unlock' : 'Lock this exercise'}">
+            ${isLocked ? '🔒' : '🔓'}
+          </button>
+        </div>
+        <div class="movement-ex-prescription">${d.format || ''} · ${d.duration || ex.reps}</div>
+        <div class="metcon-move-list">${movementRows}</div>
+      </div>`;
+    }
+
     const prescription = ex.bodyweight
       ? `${ex.sets} sets × ${ex.reps} reps`
       : `${ex.sets} sets × ${ex.reps} reps @ ${ex.weight} lb`;
@@ -1748,7 +1781,7 @@ window.doMovementDay = function() {
         locked: false,
         movementDay: true,
         prescription: isMetcon ? ex.reps : ex.reps,
-        metconPrescription: ex.metconPrescription || null,
+        metconDetails: ex.metconDetails || null,
         maxReps,
         category: ex.category,
       };
@@ -1768,9 +1801,13 @@ window.renderMovementWorkout = function() {
   container.innerHTML = currentSession.liftResults.map((lr, idx) => {
     const catClass = 'cat-' + lr.category;
 
-    // MetCon exercises render differently — just a done/not-done toggle
+    // MetCon exercises render as a structured movement list — done/not-done toggle
     if (lr.category === 'MetCon') {
       const isDone = lr.sets[0] === true;
+      const d = lr.metconDetails;
+      const movementRows = d && d.movements
+        ? d.movements.map(m => `<div class="metcon-move-row"><span class="metcon-move-name">${m.movement}</span><span class="metcon-move-reps">${m.reps}</span></div>`).join('')
+        : '';
       return `<div class="lift-card card ${isDone ? 'lift-done' : ''}" style="border-color:var(--danger);opacity:${isDone?'0.8':'1'};">
         <div class="lift-header">
           <div>
@@ -1778,13 +1815,13 @@ window.renderMovementWorkout = function() {
               ${lr.name}
               <span class="movement-ex-cat ${catClass}" style="margin-left:8px;font-size:11px;">METCON</span>
             </div>
-            <div class="lift-warn deload-note" style="color:var(--muted);font-style:normal;">${lr.metconPrescription || lr.prescription}</div>
           </div>
           <div class="lift-weight-block">
-            <div class="lift-prescription">${lr.prescription}</div>
+            <div class="lift-prescription">${d ? d.format + ' · ' + d.duration : lr.prescription}</div>
           </div>
         </div>
-        <div class="sets-row">
+        <div class="metcon-move-list">${movementRows}</div>
+        <div class="sets-row" style="margin-top:10px;">
           <button class="set-btn ${isDone ? 'done' : ''}" style="width:auto;padding:0 16px;"
             onclick="toggleMetconDone(${idx})">${isDone ? '✓ DONE' : 'MARK DONE'}</button>
         </div>
