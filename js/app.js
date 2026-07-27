@@ -1397,7 +1397,7 @@ function cycleMovementRep(current, maxReps) {
 }
 
 // Build the prompt, used both for generation and "show prompt"
-function buildMovementPrompt(weights, recentSummary, minIncrement, lockedExercises, daysSinceLast, includeMetcon) {
+function buildMovementPrompt(weights, recentSummary, minIncrement, lockedExercises, daysSinceLast, includeMetcon, recentMovementExercises = []) {
   const lockedNames = lockedExercises.map(e => e.name);
   const lockedCategories = lockedExercises.map(e => e.category);
 
@@ -1412,6 +1412,17 @@ function buildMovementPrompt(weights, recentSummary, minIncrement, lockedExercis
   const neededSection = needed.length > 0
     ? 'New exercises MUST cover these categories (one each, no more): ' + needed.join(', ') + '.'
     : 'All required categories covered by locked exercises. Pick complementary movements.';
+
+  // Tell Claude what was used recently so it avoids repetition
+  const recentlyUsed = recentMovementExercises.filter(
+    name => !lockedExercises.map(e => e.name).includes(name)
+  );
+  const varietySection = recentlyUsed.length > 0
+    ? 'AVOID repeating these exercises used in recent movement sessions: ' + recentlyUsed.join(', ') + '. Choose different movements for variety.'
+    : 'Choose a variety of exercises — do not default to the most common movements.';
+
+  // Add a random seed to prevent Claude from caching/repeating the same workout
+  const seed = Math.floor(Math.random() * 10000);
 
   let daysNote = 'No previous session data.';
   if (daysSinceLast != null) {
@@ -1440,10 +1451,13 @@ Recent sessions: ${recentSummary || 'No recent data'}.
 Minimum weight increment: ${minIncrement}lb.
 ${lockedSection}
 ${neededSection}
+${varietySection}
 ${metconSection}
 
+[Variety seed: ${seed}]
+
 Generate exactly ${remainingCount} NEW exercise${remainingCount !== 1 ? 's' : ''} (not counting any MetCon). STRICT RULES:
-1. NEVER repeat any exercise name from the locked list or from your own new exercises
+1. NEVER repeat any exercise name from the locked list, the avoid list, or your own new exercises
 2. Cover each needed category exactly once — no doubling up on any category
 3. Loads at 40-60% of working weights, or light dumbbell/kettlebell alternatives
 4. Rep scheme as a range like "10-12" — movement quality over load today
@@ -1474,11 +1488,20 @@ If bodyweight set bodyweight to true and weight to 0. Round all weights to neare
 // Core fetch function — fetches only the non-locked exercises
 async function fetchMovementWorkout(lockedExercises) {
   const settings = getGlobalSettings();
-  const { getSessions } = await import('./db.js');
-  const recent = await getSessions(user.id, 3);
+  const { getSessions, getMovementSessions } = await import('./db.js');
+  const [recent, recentMovement] = await Promise.all([
+    getSessions(user.id, 3),
+    getMovementSessions(user.id, 5),
+  ]);
   const recentSummary = recent.map(s =>
     s.workout_day + ': ' + s.session_lifts.map(l => l.lift_name + ' ' + l.weight + 'lb ' + l.sets_passed + '/5').join(', ')
   ).join(' | ');
+
+  // Collect recently used movement day exercise names so Claude avoids repeating them
+  const recentMovementExercises = recentMovement
+    .flatMap(s => (s.movement_session_exercises || []).map(e => e.name))
+    .filter((name, i, arr) => arr.indexOf(name) === i) // unique
+    .slice(0, 12); // last ~12 unique exercises used
 
   // Calculate days since last session for prompt context
   let daysSinceLast = null;
@@ -1495,7 +1518,7 @@ async function fetchMovementWorkout(lockedExercises) {
     deadlift: liftStates.deadlift?.weight ?? 45,
   };
 
-  lastMovementPrompt = buildMovementPrompt(weights, recentSummary, settings.minIncrement, lockedExercises, daysSinceLast, includeMetcon);
+  lastMovementPrompt = buildMovementPrompt(weights, recentSummary, settings.minIncrement, lockedExercises, daysSinceLast, includeMetcon, recentMovementExercises);
 
   const { data: { session: authSession } } = await supabase.auth.getSession();
   const resp = await fetch(`${SUPABASE_FUNCTIONS_URL}/generate-movement-workout`, {
@@ -1627,7 +1650,11 @@ window.rerollMovementDay = async function() {
     // Build final exercise list: locked exercises in their original positions,
     // new exercises filling the remaining slots in order
     const lockedIndices = Object.keys(movementLockedExercises).map(Number).sort();
-    const newExercises = [...newWorkout.exercises]; // only the newly generated ones
+    // Safety net: remove any exercises Claude generated that duplicate locked names
+    const lockedNameSet = new Set(lockedList.map(e => e.name.toLowerCase()));
+    const newExercises = newWorkout.exercises.filter(
+      ex => !lockedNameSet.has(ex.name.toLowerCase())
+    );
     const finalExercises = [];
     let newIdx = 0;
 
