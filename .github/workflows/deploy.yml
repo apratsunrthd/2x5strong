@@ -14,7 +14,7 @@ jobs:
 
       - uses: supabase/setup-cli@v1
         with:
-          version: latest
+          version: 2.109.0
 
       - name: Run migrations
         run: supabase db push --db-url "${{ secrets.SUPABASE_DB_URL }}"
@@ -30,7 +30,7 @@ jobs:
 
       - uses: supabase/setup-cli@v1
         with:
-          version: latest
+          version: 2.109.0
 
       - name: Deploy edge functions
         run: supabase functions deploy generate-movement-workout --project-ref ${{ secrets.SUPABASE_PROJECT_REF }}
