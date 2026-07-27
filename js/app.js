@@ -690,6 +690,12 @@ window.confirmFinish = async function() {
             const moves = (d.movements || []).map(m => m.movement + ' x' + m.reps).join(', ');
             prescription = (d.format || '') + ' ' + (d.duration || '') + ': ' + moves;
           }
+          // Bake bodyweight modifier (band assist or added weight) into prescription for storage
+          if (lr.modifierType === 'band' && lr.modifierValue) {
+            prescription += ' [' + lr.modifierValue + ' band assist]';
+          } else if (lr.modifierType === 'weight' && lr.modifierValue) {
+            prescription += ' [+' + lr.modifierValue + 'lb added]';
+          }
           return {
             name: lr.name,
             category: lr.category,
@@ -1992,6 +1998,8 @@ window.doMovementDay = function() {
         movementDay: true,
         prescription: isMetcon ? ex.reps : ex.reps,
         metconDetails: ex.metconDetails || null,
+        modifierType: null,
+        modifierValue: null,
         maxReps,
         category: ex.category,
       };
@@ -2055,6 +2063,18 @@ window.renderMovementWorkout = function() {
     const totalReps = recordedSets.reduce((a, v) => a + (v || 0), 0);
     const summaryLabel = recordedSets.length === 0 ? 'tap to record' : `${totalReps} reps done`;
 
+    // Bodyweight exercises can optionally get a band-assist or added-weight modifier
+    let modifierBadge = '';
+    if (lr.weight === 0) {
+      if (lr.modifierType === 'band' && lr.modifierValue) {
+        modifierBadge = `<div class="lift-warn deload-note" style="color:var(--info);">${lr.modifierValue} band assist</div>`;
+      } else if (lr.modifierType === 'weight' && lr.modifierValue) {
+        modifierBadge = `<div class="lift-warn deload-note" style="color:var(--accent-dim);">+${lr.modifierValue} lb added</div>`;
+      } else {
+        modifierBadge = '<div class="lift-warn deload-note">Bodyweight</div>';
+      }
+    }
+
     return `<div class="lift-card card ${allDone ? 'lift-done' : ''}">
       <div class="lift-header">
         <div>
@@ -2062,11 +2082,11 @@ window.renderMovementWorkout = function() {
             ${lr.name}
             <span class="movement-ex-cat ${catClass}" style="margin-left:8px;font-size:11px;">${lr.category}</span>
           </div>
-          ${lr.weight === 0 ? '<div class="lift-warn deload-note">Bodyweight</div>' : ''}
+          ${modifierBadge}
         </div>
-        <div class="lift-weight-block" ${lr.weight > 0 ? `onclick="editMovementWeight(${idx})" style="cursor:pointer;" title="Tap to edit weight"` : ''}>
+        <div class="lift-weight-block" onclick="${lr.weight > 0 ? `editMovementWeight(${idx})` : `editMovementModifier(${idx})`}" style="cursor:pointer;" title="Tap to edit">
           ${lr.weight > 0 ? `<div class="lift-weight">${lr.weight}<span>lb</span></div>` : ''}
-          <div class="lift-prescription">${lr.sets.length} × ${lr.prescription} ${lr.weight > 0 ? '<span style="font-size:10px;color:var(--muted2);">✎</span>' : ''}</div>
+          <div class="lift-prescription">${lr.sets.length} × ${lr.prescription} <span style="font-size:10px;color:var(--muted2);">✎</span></div>
         </div>
       </div>
       <div class="sets-row">
@@ -2102,6 +2122,42 @@ window.editMovementWeight = function(liftIdx) {
   saveDraftSession();
   renderMovementWorkout();
   toast(lr.name + ' updated to ' + lr.weight + ' lb', 'success');
+};
+
+// For bodyweight exercises (weight === 0) — offer band assist or added weight
+window.editMovementModifier = function(liftIdx) {
+  const lr = currentSession.liftResults[liftIdx];
+  const settings = getGlobalSettings();
+  const bandColors = settings.bandColors || DEFAULT_BAND_COLORS;
+
+  const bandNames = bandColors.map(b => b.name).join(', ');
+  const choice = prompt(
+    lr.name + ' — add a modifier?\n\n' +
+    'Type a band color for assistance (' + bandNames + '),\n' +
+    'or a number for added weight in lb,\n' +
+    'or leave blank to clear.',
+    lr.modifierType === 'band' ? lr.modifierValue : (lr.modifierType === 'weight' ? lr.modifierValue : '')
+  );
+
+  if (choice === null) return; // cancelled
+
+  const trimmed = choice.trim();
+  if (trimmed === '') {
+    lr.modifierType = null;
+    lr.modifierValue = null;
+  } else if (!isNaN(parseFloat(trimmed))) {
+    lr.modifierType = 'weight';
+    lr.modifierValue = roundToIncrement(parseFloat(trimmed), settings.minIncrement);
+  } else {
+    const match = bandColors.find(b => b.name.toLowerCase() === trimmed.toLowerCase());
+    if (!match) { toast('Unknown band color — try: ' + bandNames, 'error'); return; }
+    lr.modifierType = 'band';
+    lr.modifierValue = match.name;
+  }
+
+  saveDraftSession();
+  renderMovementWorkout();
+  toast(lr.name + ' updated', 'success');
 };
 
 // ── Boot ──────────────────────────────────────────────────────
