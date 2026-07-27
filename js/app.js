@@ -1382,6 +1382,7 @@ let movementDayWorkout = null;  // current AI-generated workout
 let movementLockedExercises = {}; // { index: exerciseObj } — locked in place on reroll
 let lastMovementPrompt = '';    // for "show prompt" feature
 let includeMetcon = true;       // whether to include a MetCon finisher
+let rerolledExerciseNames = new Set(); // exercises generated this session — never reappear on reroll
 
 // Parse the max reps from a range string like "10-12" → 12, or "10" → 10
 function parseMaxReps(repsStr) {
@@ -1397,7 +1398,7 @@ function cycleMovementRep(current, maxReps) {
 }
 
 // Build the prompt, used both for generation and "show prompt"
-function buildMovementPrompt(weights, recentSummary, minIncrement, lockedExercises, daysSinceLast, includeMetcon, recentMovementExercises = []) {
+function buildMovementPrompt(weights, recentSummary, minIncrement, lockedExercises, daysSinceLast, includeMetcon, recentMovementExercises = [], rerolledNames = new Set()) {
   const lockedNames = lockedExercises.map(e => e.name);
   const lockedCategories = lockedExercises.map(e => e.category);
 
@@ -1413,12 +1414,17 @@ function buildMovementPrompt(weights, recentSummary, minIncrement, lockedExercis
     ? 'New exercises MUST cover these categories (one each, no more): ' + needed.join(', ') + '.'
     : 'All required categories covered by locked exercises. Pick complementary movements.';
 
-  // Tell Claude what was used recently so it avoids repetition
-  const recentlyUsed = recentMovementExercises.filter(
-    name => !lockedExercises.map(e => e.name).includes(name)
-  );
-  const varietySection = recentlyUsed.length > 0
-    ? 'AVOID repeating these exercises used in recent movement sessions: ' + recentlyUsed.join(', ') + '. Choose different movements for variety.'
+  // Combine recently-used (from DB) and rerolled-this-session exercises into one exclusion list
+  const lockedNameSet = new Set(lockedExercises.map(e => e.name.toLowerCase()));
+  const allExcluded = [
+    ...recentMovementExercises,
+    ...[...rerolledNames],
+  ]
+    .filter(name => !lockedNameSet.has(name.toLowerCase()))
+    .filter((name, i, arr) => arr.indexOf(name) === i); // unique
+
+  const varietySection = allExcluded.length > 0
+    ? 'STRICTLY AVOID these exercises (used recently or already shown this session): ' + allExcluded.join(', ') + '. Do NOT use any of these under any circumstances.'
     : 'Choose a variety of exercises — do not default to the most common movements.';
 
   // Add a random seed to prevent Claude from caching/repeating the same workout
@@ -1518,7 +1524,7 @@ async function fetchMovementWorkout(lockedExercises) {
     deadlift: liftStates.deadlift?.weight ?? 45,
   };
 
-  lastMovementPrompt = buildMovementPrompt(weights, recentSummary, settings.minIncrement, lockedExercises, daysSinceLast, includeMetcon, recentMovementExercises);
+  lastMovementPrompt = buildMovementPrompt(weights, recentSummary, settings.minIncrement, lockedExercises, daysSinceLast, includeMetcon, recentMovementExercises, rerolledExerciseNames);
 
   const { data: { session: authSession } } = await supabase.auth.getSession();
   const resp = await fetch(`${SUPABASE_FUNCTIONS_URL}/generate-movement-workout`, {
@@ -1599,6 +1605,7 @@ window.openMovementDay = async function() {
   movementLockedExercises = {};
   lastMovementPrompt = '';
   includeMetcon = true;
+  rerolledExerciseNames = new Set(); // fresh pool for new modal session
   document.getElementById('movement-modal-title').textContent = 'MOVEMENT DAY';
   document.getElementById('movement-tagline').textContent = '';
   document.getElementById('movement-do-it-btn').style.display = 'none';
@@ -1613,6 +1620,8 @@ window.openMovementDay = async function() {
   try {
     const workout = await fetchMovementWorkout([]);
     movementDayWorkout = workout;
+    // Track all generated exercises so reroll never repeats them
+    workout.exercises.forEach(ex => rerolledExerciseNames.add(ex.name.toLowerCase()));
     renderMovementModal(workout, movementLockedExercises);
   } catch(e) {
     console.error('Movement day error:', e);
@@ -1650,11 +1659,13 @@ window.rerollMovementDay = async function() {
     // Build final exercise list: locked exercises in their original positions,
     // new exercises filling the remaining slots in order
     const lockedIndices = Object.keys(movementLockedExercises).map(Number).sort();
-    // Safety net: remove any exercises Claude generated that duplicate locked names
+    // Safety net: remove any exercises Claude generated that duplicate locked
+    // names OR anything already shown this session (rerolledExerciseNames)
     const lockedNameSet = new Set(lockedList.map(e => e.name.toLowerCase()));
-    const newExercises = newWorkout.exercises.filter(
-      ex => !lockedNameSet.has(ex.name.toLowerCase())
-    );
+    const newExercises = newWorkout.exercises.filter(ex => {
+      const lc = ex.name.toLowerCase();
+      return !lockedNameSet.has(lc) && !rerolledExerciseNames.has(lc);
+    });
     const finalExercises = [];
     let newIdx = 0;
 
@@ -1672,6 +1683,9 @@ window.rerollMovementDay = async function() {
 
     const merged = { ...newWorkout, exercises: finalExercises };
     movementDayWorkout = merged;
+
+    // Add newly generated (non-locked) exercises to the exclusion set
+    newExercises.forEach(ex => rerolledExerciseNames.add(ex.name.toLowerCase()));
 
     // Lock map stays the same — indices don't change
     renderMovementModal(merged, movementLockedExercises);
