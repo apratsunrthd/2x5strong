@@ -1402,50 +1402,47 @@ function buildMovementPrompt(weights, recentSummary, minIncrement, lockedExercis
   const lockedNames = lockedExercises.map(e => e.name);
   const lockedCategories = lockedExercises.map(e => e.category);
 
-  // Full required categories: Push, Pull, Hinge, Core
   const needed = ['Push', 'Pull', 'Hinge', 'Core'].filter(c => !lockedCategories.includes(c));
   const remainingCount = Math.max(needed.length, 4 - lockedExercises.length);
 
   const lockedSection = lockedNames.length > 0
-    ? 'LOCKED (do NOT duplicate or replace): ' + lockedNames.map((n,i) => n + ' [' + lockedExercises[i].category + ']').join(', ') + '.'
+    ? `KEPT FROM BEFORE (already chosen, do not generate a replacement for these — just use them as context for the rest of the workout): ${lockedNames.map((n,i) => n + ' [' + lockedExercises[i].category + ']').join(', ')}.`
     : '';
 
   const neededSection = needed.length > 0
-    ? 'New exercises MUST cover these categories (one each, no more): ' + needed.join(', ') + '.'
-    : 'All required categories covered by locked exercises. Pick complementary movements.';
+    ? `You only need to generate NEW exercises for these remaining categories (one each): ${needed.join(', ')}.`
+    : 'All categories are already covered by the kept exercises — generate complementary movements only if the count requires it.';
 
-  // Combine recently-used (from DB) and rerolled-this-session exercises into one exclusion list
+  // Exclusion list: previously suggested and rejected/rerolled exercises, plus recent history
   const lockedNameSet = new Set(lockedExercises.map(e => e.name.toLowerCase()));
-  const allExcluded = [
-    ...recentMovementExercises,
-    ...[...rerolledNames],
-  ]
-    .filter(name => !lockedNameSet.has(name.toLowerCase()))
-    .filter((name, i, arr) => arr.indexOf(name) === i); // unique
+  const alreadyRejected = [...rerolledNames].filter(name => !lockedNameSet.has(name.toLowerCase()));
+  const recentlyUsed = recentMovementExercises.filter(name => !lockedNameSet.has(name.toLowerCase()));
+  const allExcluded = [...new Set([...alreadyRejected, ...recentlyUsed])];
 
-  const varietySection = allExcluded.length > 0
-    ? 'STRICTLY AVOID these exercises (used recently or already shown this session): ' + allExcluded.join(', ') + '. Do NOT use any of these under any circumstances.'
-    : 'Choose a variety of exercises — do not default to the most common movements.';
+  const exclusionSection = allExcluded.length > 0
+    ? `PREVIOUSLY REJECTED — the person already saw and passed on these exercises, or did them in a recent session. NEVER suggest any of these again: ${allExcluded.join(', ')}.`
+    : '';
 
-  // Add a random seed to prevent Claude from caching/repeating the same workout
   const seed = Math.floor(Math.random() * 10000);
 
   let daysNote = 'No previous session data.';
   if (daysSinceLast != null) {
     if (daysSinceLast === 0) {
-      daysNote = 'They trained earlier today.';
+      daysNote = 'They already trained earlier today.';
     } else {
       const d = Math.round(daysSinceLast);
-      daysNote = `Their last session was ${d} day${d !== 1 ? 's' : ''} ago — the weights above are from that session.`;
+      daysNote = `Their last strength session was ${d} day${d !== 1 ? 's' : ''} ago — the weights above are from that session.`;
     }
   }
 
   const metconSection = includeMetcon ? `
-Also generate ONE MetCon/cardio finisher. This is a short conditioning piece (5-12 minutes) appropriate for someone who has access to dumbbells, kettlebells, and a pull-up bar. Use AMRAP, rounds for time, or EMOM format. If they cannot do the movement, suggest a substitution. Add it as the last exercise in the array with category "MetCon" and use the prescription field for the time/format description instead of sets/reps.` : '';
+Also generate ONE MetCon/cardio finisher (5-12 minutes) using dumbbells, kettlebells, or bodyweight — assume access to a pull-up bar. Use AMRAP, rounds-for-time, or EMOM format. Structure it as a list of individual movements with their own rep/time counts (see metconDetails schema below), not a paragraph of prose — this needs to be skimmable mid-workout.` : '';
 
-  return `You are a strength and conditioning coach designing a movement day workout for an athlete who trains 2 days per week with barbell strength work and does cycling, running, and swimming on other days.
+  return `You are a strength and conditioning coach. The athlete normally trains heavy barbell strength work 2 days per week (squat, bench, row, overhead press, deadlift) and does cycling, running, and swimming on other days.
 
-The athlete is having a low-energy day. Current working weights:
+Today they have chosen a MOVEMENT-FOCUSED session instead of their usual heavy strength work — higher reps, lighter loads, moving well rather than grinding. This is a deliberate training choice, not a fallback for feeling bad. Reps should sit in the 10-12 range, occasionally up to 15 for smaller accessory movements.
+
+Their current strength working weights (for reference, to scale down from):
 - Squat: ${weights.squat}lb
 - Bench Press: ${weights.bench}lb
 - Barbell Row: ${weights.row}lb
@@ -1455,24 +1452,26 @@ The athlete is having a low-energy day. Current working weights:
 ${daysNote}
 Recent sessions: ${recentSummary || 'No recent data'}.
 Minimum weight increment: ${minIncrement}lb.
+
 ${lockedSection}
 ${neededSection}
-${varietySection}
+${exclusionSection}
 ${metconSection}
 
-[Variety seed: ${seed}]
+[Variety seed: ${seed} — use this to pick genuinely different movements than you might default to]
 
 Generate exactly ${remainingCount} NEW exercise${remainingCount !== 1 ? 's' : ''} (not counting any MetCon). STRICT RULES:
-1. NEVER repeat any exercise name from the locked list, the avoid list, or your own new exercises
-2. Cover each needed category exactly once — no doubling up on any category
-3. Loads at 40-60% of working weights, or light dumbbell/kettlebell alternatives
-4. Rep scheme as a range like "10-12" — movement quality over load today
-5. One coaching note per exercise
+1. Do NOT generate exercises for categories already covered by the kept list
+2. NEVER use any exercise name listed under "PREVIOUSLY REJECTED" above, under any circumstances
+3. Cover each remaining needed category exactly once
+4. Loads at 40-60% of working weights, or light dumbbell/kettlebell alternatives
+5. Rep scheme as a range like "10-12" (or up to "12-15" for smaller movements)
+6. One coaching note per exercise
 
 Respond ONLY with valid JSON, no preamble, no markdown fences:
 {
   "title": "Movement Day",
-  "tagline": "short motivational line",
+  "tagline": "short motivational line about moving well, not about low energy",
   "exercises": [
     {
       "name": "Exercise Name",
@@ -1482,14 +1481,24 @@ Respond ONLY with valid JSON, no preamble, no markdown fences:
       "weight": 95,
       "bodyweight": false,
       "note": "one-line coaching cue",
-      "metconPrescription": null
+      "metconDetails": null
     }
   ]
 }
 
-For MetCon: set category to "MetCon", sets to 1, reps to the time/format (e.g. "10 min AMRAP"), weight to 0, bodyweight to true, and metconPrescription to the full description of the workout.
-For all other exercises: set metconPrescription to null.
-If bodyweight set bodyweight to true and weight to 0. Round all weights to nearest ${minIncrement}lb.`;
+${exclusionSection ? 'Reminder — do NOT use any of these: ' + allExcluded.join(', ') + '.' : ''}
+
+For the MetCon exercise (if requested): set category to "MetCon", name to a short title, sets to 1, reps to the overall duration (e.g. "10 min AMRAP"), weight to 0, bodyweight to true, and metconDetails to:
+{
+  "format": "AMRAP" | "RFT" | "EMOM",
+  "duration": "10 min",
+  "movements": [
+    { "movement": "Kettlebell Swings", "reps": "15" },
+    { "movement": "Push-ups", "reps": "10" }
+  ]
+}
+For all non-MetCon exercises, set metconDetails to null.
+If bodyweight, set bodyweight to true and weight to 0. Round all weights to nearest ${minIncrement}lb.`;
 }
 // Core fetch function — fetches only the non-locked exercises
 async function fetchMovementWorkout(lockedExercises) {
