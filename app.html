@@ -983,10 +983,16 @@
             <div class="workout-title">TODAY'S SESSION</div>
             <div class="workout-subtitle" id="workout-subtitle"></div>
           </div>
-          <button class="movement-day-btn" onclick="openMovementDay()">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
-            MOVE
-          </button>
+          <div style="display:flex;flex-direction:column;gap:6px;">
+            <button class="movement-day-btn" onclick="openMovementDay()">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+              MOVE
+            </button>
+            <button class="movement-day-btn" onclick="openRampBack()" style="border-color:var(--info);color:var(--info);">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;"><path d="M3 17l6-6 4 4 8-8M21 7v6h-6"/></svg>
+              RAMP BACK
+            </button>
+          </div>
         </div>
       </div>
       <!-- Timer bar -->
@@ -1069,6 +1075,21 @@
     <div class="modal-actions">
       <button class="btn btn-ghost" onclick="closeFinishModal()">CANCEL</button>
       <button class="btn btn-primary" onclick="confirmFinish()">SAVE</button>
+    </div>
+  </div>
+</div>
+
+<!-- Ramp Back Modal -->
+<div class="modal-overlay" id="rampback-modal">
+  <div class="movement-modal">
+    <div class="movement-modal-header">
+      <h2>RAMP BACK</h2>
+      <div class="movement-tagline">A safe glide path back to full 5x5</div>
+    </div>
+    <div class="movement-modal-body" id="rampback-modal-body"></div>
+    <div class="movement-modal-footer">
+      <button class="btn btn-ghost btn-full" onclick="closeRampBack()">CANCEL</button>
+      <button class="btn btn-primary btn-full" id="rampback-do-it-btn" onclick="applyRampBack()" style="display:none;">APPLY TO TODAY</button>
     </div>
   </div>
 </div>
@@ -1186,6 +1207,7 @@
   const fns = [
     'showTab','startTimer','openFinishModal','closeFinishModal','confirmFinish',
     'timingModalConfirm','timingModalCancel','openMovementDay','closeMovementDay',
+    'openRampBack','closeRampBack','applyRampBack','editRampBackWeight','editRampBackSets','toggleRampBackPrompt',
     'doMovementDay','renderMovementWorkout','toggleMovementSet',
     'openExercisePicker','closeExercisePicker','openAddCustomExercise',
     'closeCustomExercise','saveCustomExercise','setPickerCategory','filterPicker',

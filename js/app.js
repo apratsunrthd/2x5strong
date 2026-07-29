@@ -1618,6 +1618,250 @@ window.handleSignOut = async function() {
   await signOut();
 };
 
+// ── Ramp Back ────────────────────────────────────────────────
+// Analyzes lift history to find where the athlete's actual sets/reps have
+// slipped below a true 5x5 (or the lift's expected set count), then asks
+// Claude for a safe glide path back to full working weight.
+
+let lastRampBackPrompt = '';
+let rampBackPlan = null;
+
+// For each lift, find the most recent "true full" session (all sets recorded,
+// all at 5 reps) and the most recent session regardless of outcome.
+async function analyzeRampBackGaps() {
+  const { getSessions } = await import('./db.js');
+  const sessions = await getSessions(user.id, 100); // enough history to find full sessions
+
+  const lastFullByLift = {};   // lift_id -> { date, weight }
+  const mostRecentByLift = {}; // lift_id -> { date, weight, sets (array of reps) }
+
+  // Sessions come back newest-first
+  for (const s of sessions) {
+    for (const l of (s.session_lifts || [])) {
+      if ((l.lift_id || '').startsWith('movement_')) continue; // skip legacy movement data
+
+      if (!mostRecentByLift[l.lift_id]) {
+        mostRecentByLift[l.lift_id] = { date: s.completed_at, weight: l.weight, sets: l.sets_json || [] };
+      }
+
+      if (!lastFullByLift[l.lift_id]) {
+        const recorded = (l.sets_json || []).filter(v => v !== null && v !== 'locked');
+        const isFull = recorded.length > 0 && recorded.length === (l.sets_json || []).length && recorded.every(v => v === 5);
+        if (isFull) {
+          lastFullByLift[l.lift_id] = { date: s.completed_at, weight: l.weight };
+        }
+      }
+    }
+  }
+
+  // Build gap list: lifts where current weight exceeds what they've actually
+  // proven recently, or where the most recent session had any failed set
+  const gaps = [];
+  for (const liftId of Object.keys(LIFT_NAMES)) {
+    const current = liftStates[liftId];
+    if (!current) continue;
+
+    const lastFull = lastFullByLift[liftId];
+    const mostRecent = mostRecentByLift[liftId];
+
+    if (!mostRecent) continue; // never lifted this — nothing to ramp back from
+
+    const recentHadFailure = (mostRecent.sets || []).some(v => v !== null && v !== 'locked' && v < 5);
+    const belowPeak = lastFull && current.weight > lastFull.weight;
+    const daysSinceFull = lastFull ? (Date.now() - new Date(lastFull.date)) / (1000*60*60*24) : null;
+    const longLayoff = daysSinceFull !== null && daysSinceFull >= 14;
+
+    if (recentHadFailure || belowPeak || longLayoff) {
+      gaps.push({
+        liftId,
+        name: LIFT_NAMES[liftId],
+        currentWeight: current.weight,
+        lastFull,
+        mostRecent,
+      });
+    }
+  }
+
+  return gaps;
+}
+
+function buildRampBackPrompt(gaps, minIncrement) {
+  const lifts = gaps.map(g => {
+    const lastFullStr = g.lastFull
+      ? `Last confirmed full 5x5 at ${g.lastFull.weight}lb on ${new Date(g.lastFull.date).toLocaleDateString()}`
+      : 'No confirmed full 5x5 on record';
+    const recentSets = (g.mostRecent.sets || []).filter(v => v !== null && v !== 'locked');
+    const recentStr = recentSets.length > 0
+      ? `Most recent session: ${g.mostRecent.weight}lb, reps per set: [${recentSets.join(', ')}] on ${new Date(g.mostRecent.date).toLocaleDateString()}`
+      : `Most recent session: ${g.mostRecent.weight}lb, no completed sets recorded`;
+    return `${g.name}:\n  Current target weight: ${g.currentWeight}lb\n  ${lastFullStr}\n  ${recentStr}`;
+  }).join('\n\n');
+
+  return `You are a strength coach helping an athlete safely rebuild back to a standard 5 sets x 5 reps barbell program after a layoff or a rough patch. The goal is STRENGTH — get them back to full 5x5 at their target weight as efficiently as is safe, not to be overly conservative.
+
+For each lift below, recommend today's session: a weight and a number of sets (1-5, always 5 reps per set — reps stay fixed at 5, only sets and weight are adjusted). Base this on the gap between their last confirmed full 5x5 and their most recent actual performance.
+
+${lifts}
+
+Rules:
+1. If they nearly hit full 5x5 recently (e.g. 4/5 sets clean), recommend close to full sets at the same or slightly reduced weight
+2. If there's been a long layoff or they failed badly, reduce both weight and sets more meaningfully — safety first, but don't be overly timid
+3. Never recommend below 3 sets unless the layoff is severe (3+ weeks) or performance was very poor
+4. Weight should trend toward their last confirmed full 5x5 weight, not below it unless truly necessary
+5. One sentence of reasoning per lift
+
+Respond ONLY with valid JSON, no preamble, no markdown fences:
+{
+  "recommendations": [
+    {
+      "liftId": "squat",
+      "name": "Squat",
+      "weight": 185,
+      "sets": 4,
+      "note": "one-sentence reasoning"
+    }
+  ]
+}`;
+}
+
+window.openRampBack = async function() {
+  document.getElementById('rampback-modal-body').innerHTML = `
+    <div class="movement-loading">
+      <span class="spinner" style="width:28px;height:28px;border-width:3px;color:var(--accent);"></span>
+      <p>Analyzing your training history…</p>
+    </div>`;
+  document.getElementById('rampback-do-it-btn').style.display = 'none';
+  document.getElementById('rampback-modal').classList.add('open');
+
+  try {
+    const gaps = await analyzeRampBackGaps();
+
+    if (gaps.length === 0) {
+      document.getElementById('rampback-modal-body').innerHTML = `
+        <div class="movement-loading">
+          <p style="color:var(--success);font-size:32px;">✓</p>
+          <p>You're right on track — no ramp back needed. Your working weights match your recent performance.</p>
+        </div>`;
+      return;
+    }
+
+    const settings = getGlobalSettings();
+    lastRampBackPrompt = buildRampBackPrompt(gaps, settings.minIncrement);
+
+    const { data: { session: authSession } } = await supabase.auth.getSession();
+    const resp = await fetch(`${SUPABASE_FUNCTIONS_URL}/generate-rampback-plan`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${authSession.access_token}`,
+      },
+      body: JSON.stringify({ prompt: lastRampBackPrompt, minIncrement: settings.minIncrement }),
+    });
+
+    if (!resp.ok) throw new Error('Function returned ' + resp.status);
+    const plan = await resp.json();
+    if (plan.error) throw new Error(plan.error);
+
+    rampBackPlan = plan;
+    renderRampBackModal(plan);
+
+  } catch (e) {
+    console.error('Ramp back error:', e);
+    document.getElementById('rampback-modal-body').innerHTML = `
+      <div class="movement-loading">
+        <p style="color:var(--danger);">Failed to generate a plan. Check your connection and try again.</p>
+        <p style="font-size:12px;color:var(--muted2);">${e.message}</p>
+      </div>`;
+  }
+};
+
+function renderRampBackModal(plan) {
+  const rows = plan.recommendations.map((r, i) => {
+    return `<div class="movement-exercise" id="rampback-rec-${i}">
+      <div class="movement-ex-header">
+        <span class="movement-ex-name">${r.name}</span>
+      </div>
+      <div class="movement-ex-prescription">
+        <span onclick="editRampBackWeight(${i})" style="cursor:pointer;border-bottom:1px dashed var(--muted2);">${r.weight} lb</span>
+        &nbsp;×&nbsp;
+        <span onclick="editRampBackSets(${i})" style="cursor:pointer;border-bottom:1px dashed var(--muted2);">${r.sets} sets</span>
+        &nbsp;×&nbsp;5 reps
+      </div>
+      <div class="movement-ex-note">${r.note}</div>
+    </div>`;
+  }).join('');
+
+  const promptHtml = `
+    <div class="movement-prompt-section">
+      <button class="movement-prompt-toggle" onclick="toggleRampBackPrompt()">Show prompt ▾</button>
+      <div class="movement-prompt-body" id="rampback-prompt-body" style="display:none;">
+        <pre class="movement-prompt-text">${lastRampBackPrompt.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</pre>
+      </div>
+    </div>`;
+
+  document.getElementById('rampback-modal-body').innerHTML = rows + promptHtml;
+  document.getElementById('rampback-do-it-btn').style.display = 'block';
+}
+
+window.editRampBackWeight = function(idx) {
+  const r = rampBackPlan.recommendations[idx];
+  const val = parseFloat(prompt('Weight for ' + r.name + ' (lb):', r.weight));
+  if (isNaN(val) || val <= 0) return;
+  r.weight = val;
+  renderRampBackModal(rampBackPlan);
+};
+
+window.editRampBackSets = function(idx) {
+  const r = rampBackPlan.recommendations[idx];
+  const val = parseInt(prompt('Sets for ' + r.name + ' (1-5):', r.sets));
+  if (isNaN(val) || val < 1 || val > 5) return;
+  r.sets = val;
+  renderRampBackModal(rampBackPlan);
+};
+
+window.toggleRampBackPrompt = function() {
+  const body = document.getElementById('rampback-prompt-body');
+  const btn = document.querySelector('.movement-prompt-toggle');
+  if (!body) return;
+  const isHidden = body.style.display === 'none';
+  body.style.display = isHidden ? 'block' : 'none';
+  if (btn) btn.textContent = isHidden ? 'Hide prompt ▴' : 'Show prompt ▾';
+};
+
+window.closeRampBack = function() {
+  document.getElementById('rampback-modal').classList.remove('open');
+};
+
+window.applyRampBack = async function() {
+  if (!rampBackPlan) return;
+  closeRampBack();
+
+  const settings = getGlobalSettings();
+
+  for (const r of rampBackPlan.recommendations) {
+    const idx = currentSession.liftResults.findIndex(lr => lr.liftId === r.liftId);
+    if (idx === -1) continue; // lift not in today's A/B workout
+
+    const lr = currentSession.liftResults[idx];
+    const roundedWeight = roundToIncrement(r.weight, settings.minIncrement);
+
+    // Override today's session: reduced set count, adjusted weight
+    lr.weight = roundedWeight;
+    lr.sets = Array(r.sets).fill(null);
+    lr.warmups = generateWarmups(roundedWeight, lr.barWeight).map(w => ({ ...w, done: false }));
+    lr.failures = 0;
+
+    // Persist the new weight as the baseline going forward — this is the
+    // whole point of ramping back, so progression continues from here
+    await upsertLiftState(user.id, r.liftId, { weight: roundedWeight, failures: 0 });
+    liftStates[r.liftId] = { ...liftStates[r.liftId], weight: roundedWeight, failures: 0 };
+  }
+
+  saveDraftSession();
+  renderWorkout();
+  toast('Ramp back plan applied', 'success');
+};
+
 // ── Movement Day ─────────────────────────────────────────────
 
 const SUPABASE_FUNCTIONS_URL = 'https://aqbrhcdaarpcymhgshuh.supabase.co/functions/v1';
