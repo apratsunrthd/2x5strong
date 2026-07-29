@@ -557,7 +557,9 @@ window.renderWorkout = function() {
     lr.sets.some(s => s !== null) || lr.warmups.some(w => w.done)
   );
   const timerStarted = sessionStartTime !== null;
-  document.getElementById('finish-btn').disabled = !(anyWorkDone || timerStarted);
+  const finishBtn = document.getElementById('finish-btn');
+  finishBtn.disabled = !(anyWorkDone || timerStarted);
+  finishBtn.textContent = 'FINISH WORKOUT'; // always restore label — confirmFinish swaps it for a spinner while saving
 }
 
 // Expose to HTML onclick
@@ -2102,6 +2104,13 @@ window.renderMovementWorkout = function() {
       </div>
     </div>`;
   }).join('');
+
+  // Restore the finish button label and enable state — confirmFinish swaps
+  // the label for a spinner while saving, so every render pass must restore it
+  const anyDone = currentSession.liftResults.some(lr => lr.sets.some(s => s !== null));
+  const finishBtn = document.getElementById('finish-btn');
+  finishBtn.disabled = !anyDone;
+  finishBtn.textContent = 'FINISH WORKOUT';
 };
 
 window.toggleMetconDone = function(liftIdx) {
@@ -2115,9 +2124,7 @@ window.cycleMovementSet = function(liftIdx, setIdx) {
   const lr = currentSession.liftResults[liftIdx];
   lr.sets[setIdx] = cycleMovementRep(lr.sets[setIdx], lr.maxReps);
   saveDraftSession();
-  renderMovementWorkout();
-  const anyDone = currentSession.liftResults.some(lr => lr.sets.some(s => s !== null));
-  document.getElementById('finish-btn').disabled = !anyDone;
+  renderMovementWorkout(); // handles finish button state/label itself now
 };
 
 window.editMovementWeight = function(liftIdx) {
