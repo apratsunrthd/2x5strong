@@ -671,13 +671,19 @@
       border: 1px solid transparent;
       border-radius: var(--radius-sm);
       padding: 6px 8px;
-      cursor: pointer;
       width: 100%;
-      text-align: left;
       transition: background 0.12s, border-color 0.12s;
     }
     .warmup-row:hover { background: var(--surface2); border-color: var(--border); }
     .warmup-row.warmup-done { background: var(--success-bg); border-color: var(--success); }
+    .warmup-check-btn {
+      background: none;
+      border: none;
+      padding: 0;
+      cursor: pointer;
+      flex-shrink: 0;
+      display: flex;
+    }
     .warmup-check {
       width: 20px;
       height: 20px;
@@ -689,7 +695,6 @@
       font-size: 11px;
       font-weight: 700;
       color: var(--success);
-      flex-shrink: 0;
       transition: border-color 0.12s, background 0.12s;
     }
     .warmup-done .warmup-check {
@@ -703,7 +708,10 @@
       font-weight: 700;
       color: var(--muted);
       min-width: 64px;
+      cursor: pointer;
+      border-bottom: 1px dashed var(--muted2);
     }
+    .warmup-weight:hover { color: var(--accent); border-color: var(--accent); }
     .warmup-done .warmup-weight { color: var(--text); }
     .warmup-unit {
       font-size: 12px;
@@ -1181,7 +1189,7 @@
     'doMovementDay','renderMovementWorkout','toggleMovementSet',
     'openExercisePicker','closeExercisePicker','openAddCustomExercise',
     'closeCustomExercise','saveCustomExercise','setPickerCategory','filterPicker',
-    'cycleSet','toggleWarmup','editLiftWeight','addSuggestedAccessory',
+    'cycleSet','toggleWarmup','editWarmupWeight','editLiftWeight','addSuggestedAccessory',
     'cycleMovementSet','toggleMovementLock','rerollMovementDay','toggleMovementPrompt','editMovementWeight','toggleMetcon','toggleMetconDone',
     'openEditHistory','closeEditHistory','saveEditHistory','updateEditSet','updateEditWeight',
     'buildBandColorRows','editBandColor','addBandColor','removeBandColor','updateAccessorySetField','editMovementModifier',

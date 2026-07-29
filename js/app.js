@@ -472,17 +472,19 @@ window.renderWorkout = function() {
     else if (failures >= 2) badge += `<span class="badge badge-danger" style="margin-left:8px;">${failures} FAILS</span>`;
 
     // Generate warmup sets display (interactive, optional)
+    // Weight is tap-to-edit (for plate-friendly rounding); check toggles done separately.
     const warmupsHtml = lr.warmups.length === 0 ? '' : `
       <div class="warmup-sets">
-        <div class="warmup-label">WARM-UP <span class="warmup-optional">— optional</span></div>
+        <div class="warmup-label">WARM-UP <span class="warmup-optional">— optional, tap weight to adjust</span></div>
         <div class="warmup-rows">${lr.warmups.map((w, wi) =>
-          `<button class="warmup-row ${w.done ? 'warmup-done' : ''}"
-                   onclick="toggleWarmup(${idx},${wi})"
-                   aria-label="${w.weight}lb × ${w.reps} reps, ${w.done ? 'done' : 'not done'}">
-            <span class="warmup-check">${w.done ? '✓' : ''}</span>
-            <span class="warmup-weight">${w.weight}<span class="warmup-unit">lb</span></span>
+          `<div class="warmup-row ${w.done ? 'warmup-done' : ''}">
+            <button class="warmup-check-btn" onclick="toggleWarmup(${idx},${wi})"
+                    aria-label="Mark ${w.done ? 'not done' : 'done'}">
+              <span class="warmup-check">${w.done ? '✓' : ''}</span>
+            </button>
+            <span class="warmup-weight" onclick="editWarmupWeight(${idx},${wi})" title="Tap to edit">${w.weight}<span class="warmup-unit">lb</span></span>
             <span class="warmup-reps">${w.reps} rep${w.reps !== 1 ? 's' : ''}</span>
-          </button>`
+          </div>`
         ).join('')}</div>
       </div>
     `;
@@ -584,6 +586,17 @@ window.cycleSet = function(liftIdx, setIdx) {
 window.toggleWarmup = function(liftIdx, warmupIdx) {
   const lr = currentSession.liftResults[liftIdx];
   lr.warmups[warmupIdx].done = !lr.warmups[warmupIdx].done;
+  saveDraftSession();
+  renderWorkout();
+};
+
+window.editWarmupWeight = function(liftIdx, warmupIdx) {
+  const lr = currentSession.liftResults[liftIdx];
+  const w = lr.warmups[warmupIdx];
+  const val = parseFloat(prompt('Warmup weight (lb):', w.weight));
+  if (isNaN(val) || val < 0) return;
+  // No forced rounding here — this is exactly for "130 might as well be 135" convenience
+  w.weight = val;
   saveDraftSession();
   renderWorkout();
 };
