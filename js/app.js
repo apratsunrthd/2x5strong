@@ -108,6 +108,37 @@ function saveGlobalSettings(settings) {
   localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
 }
 
+// ── Pending ramp-back state ─────────────────────────────────────
+// Ramp-back guidance (recommended set count) needs to survive switching
+// between Workout A/B, reloading the page, etc. — a lift like squat or
+// deadlift might not come up again until the OTHER day's session, and the
+// guidance shouldn't just vanish because it wasn't in whatever session was
+// open at the moment Apply was tapped. It only clears once that specific
+// lift actually achieves a genuine full 5x5 (see confirmFinish).
+function getPendingRampBackKey() {
+  return '2x5strong_rampback_' + (user ? user.id : 'anon');
+}
+
+function getPendingRampBack() {
+  try {
+    const raw = localStorage.getItem(getPendingRampBackKey());
+    if (raw) return JSON.parse(raw);
+  } catch(e) {}
+  return {};
+}
+
+function savePendingRampBack(map) {
+  localStorage.setItem(getPendingRampBackKey(), JSON.stringify(map));
+}
+
+function clearPendingRampBackForLift(liftId) {
+  const map = getPendingRampBack();
+  if (map[liftId]) {
+    delete map[liftId];
+    savePendingRampBack(map);
+  }
+}
+
 // Round weight to nearest minIncrement (0.5 rounds up)
 // ── Session persistence (survives page reload) ───────────────
 const SESSION_DRAFT_KEY = '2x5strong_draft';
