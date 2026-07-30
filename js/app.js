@@ -1710,29 +1710,49 @@ async function analyzeRampBackGaps() {
 }
 
 function buildRampBackPrompt(gaps, minIncrement) {
+  const now = Date.now();
+
   const lifts = gaps.map(g => {
+    const daysSinceFull = g.lastFull
+      ? Math.round((now - new Date(g.lastFull.date)) / (1000*60*60*24))
+      : null;
+    const daysSinceRecent = Math.round((now - new Date(g.mostRecent.date)) / (1000*60*60*24));
+
+    // Explicit layoff tier — don't make the model do date arithmetic, hand it the answer
+    let layoffTier = 'minimal (under a week)';
+    if (daysSinceFull !== null) {
+      if (daysSinceFull >= 30) layoffTier = 'MAJOR — a month or more since a true full 5x5, treat as a real layoff';
+      else if (daysSinceFull >= 14) layoffTier = 'MODERATE — two to four weeks since a true full 5x5';
+      else if (daysSinceFull >= 7) layoffTier = 'MILD — about a week since a true full 5x5';
+    }
+
     const lastFullStr = g.lastFull
-      ? `Last confirmed full 5x5 at ${g.lastFull.weight}lb on ${new Date(g.lastFull.date).toLocaleDateString()}`
-      : 'No confirmed full 5x5 on record';
+      ? `Last confirmed full 5x5: ${g.lastFull.weight}lb, ${daysSinceFull} days ago. LAYOFF SEVERITY: ${layoffTier}.`
+      : 'No confirmed full 5x5 on record — treat conservatively, no proven baseline.';
+
     const recentSets = (g.mostRecent.sets || []).filter(v => v !== null && v !== 'locked');
     const recentStr = recentSets.length > 0
-      ? `Most recent session: ${g.mostRecent.weight}lb, reps per set: [${recentSets.join(', ')}] on ${new Date(g.mostRecent.date).toLocaleDateString()}`
-      : `Most recent session: ${g.mostRecent.weight}lb, no completed sets recorded`;
-    return `${g.name}:\n  Current target weight: ${g.currentWeight}lb\n  ${lastFullStr}\n  ${recentStr}`;
+      ? `Most recent session (${daysSinceRecent} days ago): ${g.mostRecent.weight}lb, reps per set: [${recentSets.join(', ')}]`
+      : `Most recent session (${daysSinceRecent} days ago): ${g.mostRecent.weight}lb, no completed sets recorded`;
+
+    return `${g.name}:\n  Current stored target weight: ${g.currentWeight}lb (do NOT treat this as proven — it may be stale from before a layoff)\n  ${lastFullStr}\n  ${recentStr}`;
   }).join('\n\n');
 
-  return `You are a strength coach helping an athlete safely rebuild back to a standard 5 sets x 5 reps barbell program after a layoff or a rough patch. The goal is STRENGTH — get them back to full 5x5 at their target weight as efficiently as is safe, not to be overly conservative.
+  return `You are a strength coach helping an athlete safely rebuild back to a standard 5 sets x 5 reps barbell program after a layoff or a rough patch. The goal is STRENGTH — get them back to full 5x5 as efficiently as is SAFE.
 
-For each lift below, recommend today's session: a weight and a number of sets (1-5, always 5 reps per set — reps stay fixed at 5, only sets and weight are adjusted). Base this on the gap between their last confirmed full 5x5 and their most recent actual performance.
+Critical: the "current stored target weight" for each lift is just whatever was last saved in the app — it is NOT evidence they can lift it today. It may be stale from before a long layoff. Base your recommendation on the LAYOFF SEVERITY and actual recent performance, never on the stored target alone.
+
+For each lift below, recommend today's session: a weight and a number of sets (1-5, always 5 reps per set — reps stay fixed at 5, only sets and weight are adjusted).
 
 ${lifts}
 
-Rules:
-1. If they nearly hit full 5x5 recently (e.g. 4/5 sets clean), recommend close to full sets at the same or slightly reduced weight
-2. If there's been a long layoff or they failed badly, reduce both weight and sets more meaningfully — safety first, but don't be overly timid
-3. Never recommend below 3 sets unless the layoff is severe (3+ weeks) or performance was very poor
-4. Weight should trend toward their last confirmed full 5x5 weight, not below it unless truly necessary
-5. One sentence of reasoning per lift
+Rules — follow layoff severity strictly:
+1. MAJOR layoff (30+ days since a true full 5x5): recommend roughly 70-85% of the last confirmed full-5x5 weight, and 2-3 sets. Do not recommend the full previous weight even if the "current stored target" says so.
+2. MODERATE layoff (14-29 days): roughly 85-95% of last confirmed weight, 3-4 sets.
+3. MILD layoff (7-13 days): close to full weight, 4-5 sets.
+4. Minimal layoff / recent full pass: full weight, 5 sets — no reduction needed.
+5. If their most recent actual session already shows failed reps at a given weight, weight this more heavily than the layoff tier — don't recommend a weight they just failed.
+6. One sentence of reasoning per lift that references the actual days-since-full number.
 
 Respond ONLY with valid JSON, no preamble, no markdown fences:
 {
@@ -1742,7 +1762,7 @@ Respond ONLY with valid JSON, no preamble, no markdown fences:
       "name": "Squat",
       "weight": 185,
       "sets": 4,
-      "note": "one-sentence reasoning"
+      "note": "one-sentence reasoning referencing the actual layoff length"
     }
   ]
 }`;
