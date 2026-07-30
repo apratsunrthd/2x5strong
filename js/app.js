@@ -1700,8 +1700,12 @@ async function analyzeRampBackGaps() {
     }
   }
 
-  // Build gap list: lifts where current weight exceeds what they've actually
-  // proven recently, or where the most recent session had any failed set
+  // Build gap list: lifts with a REAL problem — recent failed reps, no
+  // confirmed full 5x5 on record, or a genuine layoff since the last one.
+  // NOTE: we deliberately do NOT flag "current weight > last full weight" —
+  // that's true after every single normal successful session (progression
+  // always adds an increment), so it's not a signal of anything wrong and
+  // was previously pulling every recently-clean lift into this list.
   const gaps = [];
   for (const liftId of Object.keys(LIFT_NAMES)) {
     const current = liftStates[liftId];
@@ -1713,11 +1717,11 @@ async function analyzeRampBackGaps() {
     if (!mostRecent) continue; // never lifted this — nothing to ramp back from
 
     const recentHadFailure = (mostRecent.sets || []).some(v => v !== null && v !== 'locked' && v < 5);
-    const belowPeak = lastFull && current.weight > lastFull.weight;
     const daysSinceFull = lastFull ? (Date.now() - new Date(lastFull.date)) / (1000*60*60*24) : null;
-    const longLayoff = daysSinceFull !== null && daysSinceFull >= 14;
+    const neverConfirmed = !lastFull;
+    const longLayoff = daysSinceFull !== null && daysSinceFull >= 10;
 
-    if (recentHadFailure || belowPeak || longLayoff) {
+    if (recentHadFailure || longLayoff || neverConfirmed) {
       gaps.push({
         liftId,
         name: LIFT_NAMES[liftId],
@@ -1772,7 +1776,7 @@ Rules — follow layoff severity strictly:
 1. MAJOR layoff (30+ days since a true full 5x5): recommend roughly 70-85% of the last confirmed full-5x5 weight, and 2-3 sets. Do not recommend the full previous weight even if the "current stored target" says so.
 2. MODERATE layoff (14-29 days): roughly 85-95% of last confirmed weight, 3-4 sets.
 3. MILD layoff (7-13 days): close to full weight, 4-5 sets.
-4. Minimal layoff / recent full pass: full weight, 5 sets — no reduction needed.
+4. Minimal layoff / recent full pass: use the CURRENT STORED TARGET WEIGHT as-is, full 5 sets. If they just cleanly passed a full 5x5, the stored target has ALREADY been advanced by normal progression to the correct next weight — do not revert to the old pre-progression number, that would undo real progress.
 5. If their most recent actual session already shows failed reps at a given weight, weight this more heavily than the layoff tier — don't recommend a weight they just failed.
 6. One sentence of reasoning per lift that references the actual days-since-full number.
 
