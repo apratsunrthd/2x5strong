@@ -812,13 +812,18 @@ window.confirmFinish = async function() {
           newWeight   = roundToIncrement(state.weight + effIncrement, settings.minIncrement);
           newFailures = 0;
           if (newDeloads > 0) newDeloads--;
+          // Genuine full 5x5 achieved — graduate this lift out of ramp back
+          // mode entirely. This is the only thing that clears the guidance;
+          // it persists across every day switch until this actually happens.
+          clearPendingRampBackForLift(lr.liftId);
         } else if (metRecommendedTarget) {
           // Hit the plan exactly as recommended — hold weight, no penalty.
-          // Next RAMP BACK run will see this clean data and can advance further.
+          // Guidance stays in place so it shows again next time, whichever
+          // day this lift next comes up on.
           newFailures = 0;
         }
         // else: fell short of even the reduced target — also no penalty,
-        // just leave state as-is so RAMP BACK can reassess next time.
+        // guidance stays in place, just leave state as-is.
       } else if (allFive) {
         newWeight   = roundToIncrement(state.weight + effIncrement, settings.minIncrement);
         newFailures = 0;
