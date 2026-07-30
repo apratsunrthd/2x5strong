@@ -1768,7 +1768,7 @@ function buildRampBackPrompt(gaps, minIncrement) {
 
 Critical: the "current stored target weight" for each lift is just whatever was last saved in the app — it is NOT evidence they can lift it today. It may be stale from before a long layoff. Base your recommendation on the LAYOFF SEVERITY and actual recent performance, never on the stored target alone.
 
-For each lift below, recommend today's session: a weight and a number of sets (1-5, always 5 reps per set — reps stay fixed at 5, only sets and weight are adjusted).
+For each lift below, recommend today's session: a weight and a number of sets (1-5, always 5 reps per set — reps stay fixed at 5, only sets and weight are adjusted). Use this exact liftId string for each lift in your response — do not invent your own: squat="squat", bench press="bench", barbell row="row", overhead press="press", deadlift="deadlift".
 
 ${lifts}
 
@@ -1831,6 +1831,20 @@ window.openRampBack = async function() {
     if (!resp.ok) throw new Error('Function returned ' + resp.status);
     const plan = await resp.json();
     if (plan.error) throw new Error(plan.error);
+
+    // Never trust Claude's own liftId string — it's asked to echo one back,
+    // but it can guess wrong (e.g. "benchpress" or "barbell_row" instead of
+    // our actual internal ids "bench"/"row"), which made Apply silently
+    // no-op for any lift where the id didn't match. Re-derive it ourselves
+    // from the exercise name instead, which we control completely.
+    if (plan.recommendations) {
+      plan.recommendations.forEach(r => {
+        const match = Object.entries(LIFT_NAMES).find(
+          ([id, name]) => name.toLowerCase() === (r.name || '').toLowerCase()
+        );
+        if (match) r.liftId = match[0];
+      });
+    }
 
     rampBackPlan = plan;
     renderRampBackModal(plan);
