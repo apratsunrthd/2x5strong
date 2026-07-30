@@ -1623,6 +1623,28 @@ window.toggleDay = async function() {
   toast(`Next workout set to Workout ${next}`, 'success');
 };
 
+// Quick-access version directly from the workout screen — same effect as the
+// Settings toggle, but one tap away instead of buried in a menu.
+window.quickToggleDay = async function() {
+  const anyStarted = currentSession && !currentSession.isMovementDay && currentSession.liftResults.some(lr =>
+    lr.sets.some(s => s !== null) || (lr.warmups || []).some(w => w.done)
+  );
+  if (anyStarted) {
+    if (!confirm('You have progress on today\'s workout. Switch days anyway? This will discard the current session.')) return;
+  }
+  if (currentSession && currentSession.isMovementDay) {
+    if (!confirm('Switch back to your regular A/B schedule? This will discard the current Movement Day session.')) return;
+  }
+
+  clearDraftSession();
+  const next = profile.next_workout === 'A' ? 'B' : 'A';
+  const { updateProfile } = await import('./db.js');
+  await updateProfile(user.id, { next_workout: next });
+  profile.next_workout = next;
+  initSession();
+  toast(`Switched to Workout ${next}`, 'success');
+};
+
 window.editMinIncrement = function() {
   const current = getGlobalSettings().minIncrement;
   const val = parseFloat(prompt(

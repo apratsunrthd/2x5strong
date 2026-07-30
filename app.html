@@ -59,6 +59,19 @@
       gap: 8px;
       margin-bottom: 6px;
     }
+    .day-switch-btn {
+      background: none;
+      border: none;
+      color: var(--muted2);
+      cursor: pointer;
+      padding: 2px;
+      display: flex;
+      align-items: center;
+      transition: color 0.12s, transform 0.15s;
+    }
+    .day-switch-btn:hover { color: var(--accent); transform: rotate(90deg); }
+    .day-switch-btn svg { width: 14px; height: 14px; }
+
     .workout-day-label::before {
       content: '';
       width: 8px; height: 8px;
@@ -979,7 +992,12 @@
       <div class="workout-header">
         <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;">
           <div>
-            <div class="workout-day-label" id="workout-day">WORKOUT A</div>
+            <div style="display:flex;align-items:center;gap:8px;">
+              <div class="workout-day-label" id="workout-day" style="margin-bottom:0;">WORKOUT A</div>
+              <button class="day-switch-btn" onclick="quickToggleDay()" title="Switch to the other workout day">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 1l4 4-4 4M3 11V9a4 4 0 014-4h14M7 23l-4-4 4-4M21 13v2a4 4 0 01-4 4H3"/></svg>
+              </button>
+            </div>
             <div class="workout-title">TODAY'S SESSION</div>
             <div class="workout-subtitle" id="workout-subtitle"></div>
           </div>
@@ -1217,7 +1235,7 @@
     'buildBandColorRows','editBandColor','addBandColor','removeBandColor','updateAccessorySetField','editMovementModifier',
     'addAccessoryFromPicker','removeAccessory','addAccessorySet',
     'removeAccessorySet','updateAccessorySet','editLift','editName',
-    'toggleDay','editMinIncrement','handleSignOut'
+    'toggleDay','quickToggleDay','editMinIncrement','handleSignOut'
   ];
   const queue = {};
   fns.forEach(fn => {
