@@ -525,7 +525,7 @@ window.renderWorkout = function() {
     if (lr.locked) {
       warningLine = `<div class="lift-warn">3 consecutive failures — lift ended for today</div>`;
     } else if (lr.isRampBack) {
-      warningLine = `<div class="lift-warn deload-note">Ramp back — aim for ${lr.recommendedSets} sets, up to 5 available</div>`;
+      warningLine = `<div class="lift-warn deload-note">Ramp back — extra sets welcome if you're feeling strong</div>`;
     } else if (lr.liftId === 'deadlift' && lr.weight >= DEADLIFT_HEAVY_THRESHOLD) {
       warningLine = `<div class="lift-warn deload-note">Heavy deadlift — 1 work set, +5 lb progression</div>`;
     } else if (failures >= 2 && !isDeload) {
@@ -543,7 +543,7 @@ window.renderWorkout = function() {
           </div>
           <div class="lift-weight-block" onclick="editLiftWeight(${idx})" title="Tap to edit weight" style="cursor:pointer;">
             <div class="lift-weight">${lr.weight}<span>lb</span></div>
-            <div class="lift-prescription">${totalSets} × 5 <span style="font-size:10px;color:var(--muted2);">✎</span></div>
+            <div class="lift-prescription">${lr.isRampBack ? `${lr.recommendedSets} × 5 <span style="color:var(--muted2);">(up to 5)</span>` : `${totalSets} × 5`} <span style="font-size:10px;color:var(--muted2);">✎</span></div>
           </div>
         </div>
         ${warmupsHtml}
