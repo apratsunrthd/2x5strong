@@ -524,6 +524,8 @@ window.renderWorkout = function() {
     let warningLine = '';
     if (lr.locked) {
       warningLine = `<div class="lift-warn">3 consecutive failures — lift ended for today</div>`;
+    } else if (lr.isRampBack) {
+      warningLine = `<div class="lift-warn deload-note">Ramp back — aim for ${lr.recommendedSets} sets, up to 5 available</div>`;
     } else if (lr.liftId === 'deadlift' && lr.weight >= DEADLIFT_HEAVY_THRESHOLD) {
       warningLine = `<div class="lift-warn deload-note">Heavy deadlift — 1 work set, +5 lb progression</div>`;
     } else if (failures >= 2 && !isDeload) {
@@ -742,7 +744,6 @@ window.confirmFinish = async function() {
 
       const state = liftStates[lr.liftId] || { failures: 0, deloads: 0, weight: lr.weight };
 
-      // A lift passes only if all sets were completed at 5 reps
       const recordedSets = lr.sets.filter(s => s !== null && s !== 'locked');
       const allFive = recordedSets.length === lr.sets.length && recordedSets.every(v => v === 5);
 
@@ -752,7 +753,28 @@ window.confirmFinish = async function() {
 
       const settings = getGlobalSettings();
       const effIncrement = effectiveIncrement(lr.increment, settings.minIncrement);
-      if (allFive) {
+
+      if (lr.isRampBack) {
+        // Ramp back sessions are a deliberate reduced-load rebuild, not a
+        // normal progression attempt. A full 5x5 still progresses like usual.
+        // Meeting (or missing) the recommended reduced target is expected
+        // and should never count as a "failure" toward the deload counter —
+        // that would punish exactly the safe behavior we asked for.
+        const metRecommendedTarget = recordedSets.length >= (lr.recommendedSets || lr.sets.length)
+          && recordedSets.slice(0, lr.recommendedSets || lr.sets.length).every(v => v === 5);
+
+        if (allFive) {
+          newWeight   = roundToIncrement(state.weight + effIncrement, settings.minIncrement);
+          newFailures = 0;
+          if (newDeloads > 0) newDeloads--;
+        } else if (metRecommendedTarget) {
+          // Hit the plan exactly as recommended — hold weight, no penalty.
+          // Next RAMP BACK run will see this clean data and can advance further.
+          newFailures = 0;
+        }
+        // else: fell short of even the reduced target — also no penalty,
+        // just leave state as-is so RAMP BACK can reassess next time.
+      } else if (allFive) {
         newWeight   = roundToIncrement(state.weight + effIncrement, settings.minIncrement);
         newFailures = 0;
         if (newDeloads > 0) newDeloads--;
@@ -1839,26 +1861,33 @@ window.applyRampBack = async function() {
   closeRampBack();
 
   const settings = getGlobalSettings();
+  const updates = [];
 
   for (const r of rampBackPlan.recommendations) {
-    const idx = currentSession.liftResults.findIndex(lr => lr.liftId === r.liftId);
-    if (idx === -1) continue; // lift not in today's A/B workout
-
-    const lr = currentSession.liftResults[idx];
     const roundedWeight = roundToIncrement(r.weight, settings.minIncrement);
 
-    // Override today's session: reduced set count, adjusted weight
+    // Persist the recommended weight for EVERY lift in the plan, not just the
+    // ones in today's A/B workout — otherwise the other day's lifts never
+    // benefit from the ramp back until you happen to run it again on that day.
+    updates.push(upsertLiftState(user.id, r.liftId, { weight: roundedWeight, failures: 0 }));
+    liftStates[r.liftId] = { ...liftStates[r.liftId], weight: roundedWeight, failures: 0 };
+
+    // Only lifts actually in today's session get the live session override
+    const idx = currentSession.liftResults.findIndex(lr => lr.liftId === r.liftId);
+    if (idx === -1) continue;
+
+    const lr = currentSession.liftResults[idx];
     lr.weight = roundedWeight;
-    lr.sets = Array(r.sets).fill(null);
+    // Always give 5 tappable sets — the recommendation is a target, not a
+    // hard cap, so you can push further on a day you're feeling strong.
+    lr.sets = Array(5).fill(null);
+    lr.recommendedSets = r.sets;
+    lr.isRampBack = true;
     lr.warmups = generateWarmups(roundedWeight, lr.barWeight).map(w => ({ ...w, done: false }));
     lr.failures = 0;
-
-    // Persist the new weight as the baseline going forward — this is the
-    // whole point of ramping back, so progression continues from here
-    await upsertLiftState(user.id, r.liftId, { weight: roundedWeight, failures: 0 });
-    liftStates[r.liftId] = { ...liftStates[r.liftId], weight: roundedWeight, failures: 0 };
   }
 
+  await Promise.all(updates);
   saveDraftSession();
   renderWorkout();
   toast('Ramp back plan applied', 'success');
