@@ -108,6 +108,37 @@ function saveGlobalSettings(settings) {
   localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
 }
 
+// ── Pending ramp-back state ─────────────────────────────────────
+// Ramp-back guidance (recommended set count) needs to survive switching
+// between Workout A/B, reloading the page, etc. — a lift like squat or
+// deadlift might not come up again until the OTHER day's session, and the
+// guidance shouldn't just vanish because it wasn't in whatever session was
+// open at the moment Apply was tapped. It only clears once that specific
+// lift actually achieves a genuine full 5x5 (see confirmFinish).
+function getPendingRampBackKey() {
+  return '2x5strong_rampback_' + (user ? user.id : 'anon');
+}
+
+function getPendingRampBack() {
+  try {
+    const raw = localStorage.getItem(getPendingRampBackKey());
+    if (raw) return JSON.parse(raw);
+  } catch(e) {}
+  return {};
+}
+
+function savePendingRampBack(map) {
+  localStorage.setItem(getPendingRampBackKey(), JSON.stringify(map));
+}
+
+function clearPendingRampBackForLift(liftId) {
+  const map = getPendingRampBack();
+  if (map[liftId]) {
+    delete map[liftId];
+    savePendingRampBack(map);
+  }
+}
+
 // Round weight to nearest minIncrement (0.5 rounds up)
 // ── Session persistence (survives page reload) ───────────────
 const SESSION_DRAFT_KEY = '2x5strong_draft';
@@ -398,6 +429,20 @@ function initSession() {
                  .map(w => ({ ...w, done: false })),
     }))
   };
+
+  // Apply any pending ramp-back guidance for these lifts — this is what
+  // makes it survive switching from Workout A to B and back, since it's
+  // read from persisted storage rather than carried in memory.
+  const pendingRampBack = getPendingRampBack();
+  currentSession.liftResults.forEach(lr => {
+    const rec = pendingRampBack[lr.liftId];
+    if (rec) {
+      lr.isRampBack = true;
+      lr.recommendedSets = rec.sets;
+      // Sets array always stays at 5 slots (or deadlift's dynamic count) —
+      // the recommendation is a target shown in the headline, not a cap.
+    }
+  });
 
   renderWorkout();
 }
@@ -767,13 +812,18 @@ window.confirmFinish = async function() {
           newWeight   = roundToIncrement(state.weight + effIncrement, settings.minIncrement);
           newFailures = 0;
           if (newDeloads > 0) newDeloads--;
+          // Genuine full 5x5 achieved — graduate this lift out of ramp back
+          // mode entirely. This is the only thing that clears the guidance;
+          // it persists across every day switch until this actually happens.
+          clearPendingRampBackForLift(lr.liftId);
         } else if (metRecommendedTarget) {
           // Hit the plan exactly as recommended — hold weight, no penalty.
-          // Next RAMP BACK run will see this clean data and can advance further.
+          // Guidance stays in place so it shows again next time, whichever
+          // day this lift next comes up on.
           newFailures = 0;
         }
         // else: fell short of even the reduced target — also no penalty,
-        // just leave state as-is so RAMP BACK can reassess next time.
+        // guidance stays in place, just leave state as-is.
       } else if (allFive) {
         newWeight   = roundToIncrement(state.weight + effIncrement, settings.minIncrement);
         newFailures = 0;
@@ -1922,6 +1972,7 @@ window.applyRampBack = async function() {
 
   const settings = getGlobalSettings();
   const updates = [];
+  const pending = getPendingRampBack();
 
   for (const r of rampBackPlan.recommendations) {
     const roundedWeight = roundToIncrement(r.weight, settings.minIncrement);
@@ -1931,6 +1982,12 @@ window.applyRampBack = async function() {
     // benefit from the ramp back until you happen to run it again on that day.
     updates.push(upsertLiftState(user.id, r.liftId, { weight: roundedWeight, failures: 0 }));
     liftStates[r.liftId] = { ...liftStates[r.liftId], weight: roundedWeight, failures: 0 };
+
+    // Save the recommended set count for EVERY lift in the plan too, keyed
+    // by lift id rather than by today's session — this is what survives a
+    // day switch. A lift like squat that shows up on both A and B days
+    // should keep showing this guidance no matter which day it's hit on.
+    pending[r.liftId] = { sets: r.sets, note: r.note };
 
     // Only lifts actually in today's session get the live session override
     const idx = currentSession.liftResults.findIndex(lr => lr.liftId === r.liftId);
@@ -1946,6 +2003,8 @@ window.applyRampBack = async function() {
     lr.warmups = generateWarmups(roundedWeight, lr.barWeight).map(w => ({ ...w, done: false }));
     lr.failures = 0;
   }
+
+  savePendingRampBack(pending);
 
   await Promise.all(updates);
   saveDraftSession();
