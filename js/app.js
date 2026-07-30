@@ -524,6 +524,8 @@ window.renderWorkout = function() {
     let warningLine = '';
     if (lr.locked) {
       warningLine = `<div class="lift-warn">3 consecutive failures — lift ended for today</div>`;
+    } else if (lr.isRampBack) {
+      warningLine = `<div class="lift-warn deload-note">Ramp back — aim for ${lr.recommendedSets} sets, up to 5 available</div>`;
     } else if (lr.liftId === 'deadlift' && lr.weight >= DEADLIFT_HEAVY_THRESHOLD) {
       warningLine = `<div class="lift-warn deload-note">Heavy deadlift — 1 work set, +5 lb progression</div>`;
     } else if (failures >= 2 && !isDeload) {
@@ -742,7 +744,6 @@ window.confirmFinish = async function() {
 
       const state = liftStates[lr.liftId] || { failures: 0, deloads: 0, weight: lr.weight };
 
-      // A lift passes only if all sets were completed at 5 reps
       const recordedSets = lr.sets.filter(s => s !== null && s !== 'locked');
       const allFive = recordedSets.length === lr.sets.length && recordedSets.every(v => v === 5);
 
@@ -752,7 +753,28 @@ window.confirmFinish = async function() {
 
       const settings = getGlobalSettings();
       const effIncrement = effectiveIncrement(lr.increment, settings.minIncrement);
-      if (allFive) {
+
+      if (lr.isRampBack) {
+        // Ramp back sessions are a deliberate reduced-load rebuild, not a
+        // normal progression attempt. A full 5x5 still progresses like usual.
+        // Meeting (or missing) the recommended reduced target is expected
+        // and should never count as a "failure" toward the deload counter —
+        // that would punish exactly the safe behavior we asked for.
+        const metRecommendedTarget = recordedSets.length >= (lr.recommendedSets || lr.sets.length)
+          && recordedSets.slice(0, lr.recommendedSets || lr.sets.length).every(v => v === 5);
+
+        if (allFive) {
+          newWeight   = roundToIncrement(state.weight + effIncrement, settings.minIncrement);
+          newFailures = 0;
+          if (newDeloads > 0) newDeloads--;
+        } else if (metRecommendedTarget) {
+          // Hit the plan exactly as recommended — hold weight, no penalty.
+          // Next RAMP BACK run will see this clean data and can advance further.
+          newFailures = 0;
+        }
+        // else: fell short of even the reduced target — also no penalty,
+        // just leave state as-is so RAMP BACK can reassess next time.
+      } else if (allFive) {
         newWeight   = roundToIncrement(state.weight + effIncrement, settings.minIncrement);
         newFailures = 0;
         if (newDeloads > 0) newDeloads--;
@@ -1601,6 +1623,28 @@ window.toggleDay = async function() {
   toast(`Next workout set to Workout ${next}`, 'success');
 };
 
+// Quick-access version directly from the workout screen — same effect as the
+// Settings toggle, but one tap away instead of buried in a menu.
+window.quickToggleDay = async function() {
+  const anyStarted = currentSession && !currentSession.isMovementDay && currentSession.liftResults.some(lr =>
+    lr.sets.some(s => s !== null) || (lr.warmups || []).some(w => w.done)
+  );
+  if (anyStarted) {
+    if (!confirm('You have progress on today\'s workout. Switch days anyway? This will discard the current session.')) return;
+  }
+  if (currentSession && currentSession.isMovementDay) {
+    if (!confirm('Switch back to your regular A/B schedule? This will discard the current Movement Day session.')) return;
+  }
+
+  clearDraftSession();
+  const next = profile.next_workout === 'A' ? 'B' : 'A';
+  const { updateProfile } = await import('./db.js');
+  await updateProfile(user.id, { next_workout: next });
+  profile.next_workout = next;
+  initSession();
+  toast(`Switched to Workout ${next}`, 'success');
+};
+
 window.editMinIncrement = function() {
   const current = getGlobalSettings().minIncrement;
   const val = parseFloat(prompt(
@@ -1688,29 +1732,49 @@ async function analyzeRampBackGaps() {
 }
 
 function buildRampBackPrompt(gaps, minIncrement) {
+  const now = Date.now();
+
   const lifts = gaps.map(g => {
+    const daysSinceFull = g.lastFull
+      ? Math.round((now - new Date(g.lastFull.date)) / (1000*60*60*24))
+      : null;
+    const daysSinceRecent = Math.round((now - new Date(g.mostRecent.date)) / (1000*60*60*24));
+
+    // Explicit layoff tier — don't make the model do date arithmetic, hand it the answer
+    let layoffTier = 'minimal (under a week)';
+    if (daysSinceFull !== null) {
+      if (daysSinceFull >= 30) layoffTier = 'MAJOR — a month or more since a true full 5x5, treat as a real layoff';
+      else if (daysSinceFull >= 14) layoffTier = 'MODERATE — two to four weeks since a true full 5x5';
+      else if (daysSinceFull >= 7) layoffTier = 'MILD — about a week since a true full 5x5';
+    }
+
     const lastFullStr = g.lastFull
-      ? `Last confirmed full 5x5 at ${g.lastFull.weight}lb on ${new Date(g.lastFull.date).toLocaleDateString()}`
-      : 'No confirmed full 5x5 on record';
+      ? `Last confirmed full 5x5: ${g.lastFull.weight}lb, ${daysSinceFull} days ago. LAYOFF SEVERITY: ${layoffTier}.`
+      : 'No confirmed full 5x5 on record — treat conservatively, no proven baseline.';
+
     const recentSets = (g.mostRecent.sets || []).filter(v => v !== null && v !== 'locked');
     const recentStr = recentSets.length > 0
-      ? `Most recent session: ${g.mostRecent.weight}lb, reps per set: [${recentSets.join(', ')}] on ${new Date(g.mostRecent.date).toLocaleDateString()}`
-      : `Most recent session: ${g.mostRecent.weight}lb, no completed sets recorded`;
-    return `${g.name}:\n  Current target weight: ${g.currentWeight}lb\n  ${lastFullStr}\n  ${recentStr}`;
+      ? `Most recent session (${daysSinceRecent} days ago): ${g.mostRecent.weight}lb, reps per set: [${recentSets.join(', ')}]`
+      : `Most recent session (${daysSinceRecent} days ago): ${g.mostRecent.weight}lb, no completed sets recorded`;
+
+    return `${g.name}:\n  Current stored target weight: ${g.currentWeight}lb (do NOT treat this as proven — it may be stale from before a layoff)\n  ${lastFullStr}\n  ${recentStr}`;
   }).join('\n\n');
 
-  return `You are a strength coach helping an athlete safely rebuild back to a standard 5 sets x 5 reps barbell program after a layoff or a rough patch. The goal is STRENGTH — get them back to full 5x5 at their target weight as efficiently as is safe, not to be overly conservative.
+  return `You are a strength coach helping an athlete safely rebuild back to a standard 5 sets x 5 reps barbell program after a layoff or a rough patch. The goal is STRENGTH — get them back to full 5x5 as efficiently as is SAFE.
 
-For each lift below, recommend today's session: a weight and a number of sets (1-5, always 5 reps per set — reps stay fixed at 5, only sets and weight are adjusted). Base this on the gap between their last confirmed full 5x5 and their most recent actual performance.
+Critical: the "current stored target weight" for each lift is just whatever was last saved in the app — it is NOT evidence they can lift it today. It may be stale from before a long layoff. Base your recommendation on the LAYOFF SEVERITY and actual recent performance, never on the stored target alone.
+
+For each lift below, recommend today's session: a weight and a number of sets (1-5, always 5 reps per set — reps stay fixed at 5, only sets and weight are adjusted).
 
 ${lifts}
 
-Rules:
-1. If they nearly hit full 5x5 recently (e.g. 4/5 sets clean), recommend close to full sets at the same or slightly reduced weight
-2. If there's been a long layoff or they failed badly, reduce both weight and sets more meaningfully — safety first, but don't be overly timid
-3. Never recommend below 3 sets unless the layoff is severe (3+ weeks) or performance was very poor
-4. Weight should trend toward their last confirmed full 5x5 weight, not below it unless truly necessary
-5. One sentence of reasoning per lift
+Rules — follow layoff severity strictly:
+1. MAJOR layoff (30+ days since a true full 5x5): recommend roughly 70-85% of the last confirmed full-5x5 weight, and 2-3 sets. Do not recommend the full previous weight even if the "current stored target" says so.
+2. MODERATE layoff (14-29 days): roughly 85-95% of last confirmed weight, 3-4 sets.
+3. MILD layoff (7-13 days): close to full weight, 4-5 sets.
+4. Minimal layoff / recent full pass: full weight, 5 sets — no reduction needed.
+5. If their most recent actual session already shows failed reps at a given weight, weight this more heavily than the layoff tier — don't recommend a weight they just failed.
+6. One sentence of reasoning per lift that references the actual days-since-full number.
 
 Respond ONLY with valid JSON, no preamble, no markdown fences:
 {
@@ -1720,7 +1784,7 @@ Respond ONLY with valid JSON, no preamble, no markdown fences:
       "name": "Squat",
       "weight": 185,
       "sets": 4,
-      "note": "one-sentence reasoning"
+      "note": "one-sentence reasoning referencing the actual layoff length"
     }
   ]
 }`;
@@ -1839,26 +1903,33 @@ window.applyRampBack = async function() {
   closeRampBack();
 
   const settings = getGlobalSettings();
+  const updates = [];
 
   for (const r of rampBackPlan.recommendations) {
-    const idx = currentSession.liftResults.findIndex(lr => lr.liftId === r.liftId);
-    if (idx === -1) continue; // lift not in today's A/B workout
-
-    const lr = currentSession.liftResults[idx];
     const roundedWeight = roundToIncrement(r.weight, settings.minIncrement);
 
-    // Override today's session: reduced set count, adjusted weight
+    // Persist the recommended weight for EVERY lift in the plan, not just the
+    // ones in today's A/B workout — otherwise the other day's lifts never
+    // benefit from the ramp back until you happen to run it again on that day.
+    updates.push(upsertLiftState(user.id, r.liftId, { weight: roundedWeight, failures: 0 }));
+    liftStates[r.liftId] = { ...liftStates[r.liftId], weight: roundedWeight, failures: 0 };
+
+    // Only lifts actually in today's session get the live session override
+    const idx = currentSession.liftResults.findIndex(lr => lr.liftId === r.liftId);
+    if (idx === -1) continue;
+
+    const lr = currentSession.liftResults[idx];
     lr.weight = roundedWeight;
-    lr.sets = Array(r.sets).fill(null);
+    // Always give 5 tappable sets — the recommendation is a target, not a
+    // hard cap, so you can push further on a day you're feeling strong.
+    lr.sets = Array(5).fill(null);
+    lr.recommendedSets = r.sets;
+    lr.isRampBack = true;
     lr.warmups = generateWarmups(roundedWeight, lr.barWeight).map(w => ({ ...w, done: false }));
     lr.failures = 0;
-
-    // Persist the new weight as the baseline going forward — this is the
-    // whole point of ramping back, so progression continues from here
-    await upsertLiftState(user.id, r.liftId, { weight: roundedWeight, failures: 0 });
-    liftStates[r.liftId] = { ...liftStates[r.liftId], weight: roundedWeight, failures: 0 };
   }
 
+  await Promise.all(updates);
   saveDraftSession();
   renderWorkout();
   toast('Ramp back plan applied', 'success');
