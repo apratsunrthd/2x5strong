@@ -525,7 +525,7 @@ window.renderWorkout = function() {
     if (lr.locked) {
       warningLine = `<div class="lift-warn">3 consecutive failures — lift ended for today</div>`;
     } else if (lr.isRampBack) {
-      warningLine = `<div class="lift-warn deload-note">Ramp back — aim for ${lr.recommendedSets} sets, up to 5 available</div>`;
+      warningLine = `<div class="lift-warn deload-note">Ramp back — extra sets welcome if you're feeling strong</div>`;
     } else if (lr.liftId === 'deadlift' && lr.weight >= DEADLIFT_HEAVY_THRESHOLD) {
       warningLine = `<div class="lift-warn deload-note">Heavy deadlift — 1 work set, +5 lb progression</div>`;
     } else if (failures >= 2 && !isDeload) {
@@ -543,7 +543,7 @@ window.renderWorkout = function() {
           </div>
           <div class="lift-weight-block" onclick="editLiftWeight(${idx})" title="Tap to edit weight" style="cursor:pointer;">
             <div class="lift-weight">${lr.weight}<span>lb</span></div>
-            <div class="lift-prescription">${totalSets} × 5 <span style="font-size:10px;color:var(--muted2);">✎</span></div>
+            <div class="lift-prescription">${lr.isRampBack ? `${lr.recommendedSets} × 5 <span style="color:var(--muted2);">(up to 5)</span>` : `${totalSets} × 5`} <span style="font-size:10px;color:var(--muted2);">✎</span></div>
           </div>
         </div>
         ${warmupsHtml}
@@ -1700,8 +1700,12 @@ async function analyzeRampBackGaps() {
     }
   }
 
-  // Build gap list: lifts where current weight exceeds what they've actually
-  // proven recently, or where the most recent session had any failed set
+  // Build gap list: lifts with a REAL problem — recent failed reps, no
+  // confirmed full 5x5 on record, or a genuine layoff since the last one.
+  // NOTE: we deliberately do NOT flag "current weight > last full weight" —
+  // that's true after every single normal successful session (progression
+  // always adds an increment), so it's not a signal of anything wrong and
+  // was previously pulling every recently-clean lift into this list.
   const gaps = [];
   for (const liftId of Object.keys(LIFT_NAMES)) {
     const current = liftStates[liftId];
@@ -1713,11 +1717,11 @@ async function analyzeRampBackGaps() {
     if (!mostRecent) continue; // never lifted this — nothing to ramp back from
 
     const recentHadFailure = (mostRecent.sets || []).some(v => v !== null && v !== 'locked' && v < 5);
-    const belowPeak = lastFull && current.weight > lastFull.weight;
     const daysSinceFull = lastFull ? (Date.now() - new Date(lastFull.date)) / (1000*60*60*24) : null;
-    const longLayoff = daysSinceFull !== null && daysSinceFull >= 14;
+    const neverConfirmed = !lastFull;
+    const longLayoff = daysSinceFull !== null && daysSinceFull >= 10;
 
-    if (recentHadFailure || belowPeak || longLayoff) {
+    if (recentHadFailure || longLayoff || neverConfirmed) {
       gaps.push({
         liftId,
         name: LIFT_NAMES[liftId],
@@ -1764,7 +1768,7 @@ function buildRampBackPrompt(gaps, minIncrement) {
 
 Critical: the "current stored target weight" for each lift is just whatever was last saved in the app — it is NOT evidence they can lift it today. It may be stale from before a long layoff. Base your recommendation on the LAYOFF SEVERITY and actual recent performance, never on the stored target alone.
 
-For each lift below, recommend today's session: a weight and a number of sets (1-5, always 5 reps per set — reps stay fixed at 5, only sets and weight are adjusted).
+For each lift below, recommend today's session: a weight and a number of sets (1-5, always 5 reps per set — reps stay fixed at 5, only sets and weight are adjusted). Use this exact liftId string for each lift in your response — do not invent your own: squat="squat", bench press="bench", barbell row="row", overhead press="press", deadlift="deadlift".
 
 ${lifts}
 
@@ -1772,7 +1776,7 @@ Rules — follow layoff severity strictly:
 1. MAJOR layoff (30+ days since a true full 5x5): recommend roughly 70-85% of the last confirmed full-5x5 weight, and 2-3 sets. Do not recommend the full previous weight even if the "current stored target" says so.
 2. MODERATE layoff (14-29 days): roughly 85-95% of last confirmed weight, 3-4 sets.
 3. MILD layoff (7-13 days): close to full weight, 4-5 sets.
-4. Minimal layoff / recent full pass: full weight, 5 sets — no reduction needed.
+4. Minimal layoff / recent full pass: use the CURRENT STORED TARGET WEIGHT as-is, full 5 sets. If they just cleanly passed a full 5x5, the stored target has ALREADY been advanced by normal progression to the correct next weight — do not revert to the old pre-progression number, that would undo real progress.
 5. If their most recent actual session already shows failed reps at a given weight, weight this more heavily than the layoff tier — don't recommend a weight they just failed.
 6. One sentence of reasoning per lift that references the actual days-since-full number.
 
@@ -1827,6 +1831,20 @@ window.openRampBack = async function() {
     if (!resp.ok) throw new Error('Function returned ' + resp.status);
     const plan = await resp.json();
     if (plan.error) throw new Error(plan.error);
+
+    // Never trust Claude's own liftId string — it's asked to echo one back,
+    // but it can guess wrong (e.g. "benchpress" or "barbell_row" instead of
+    // our actual internal ids "bench"/"row"), which made Apply silently
+    // no-op for any lift where the id didn't match. Re-derive it ourselves
+    // from the exercise name instead, which we control completely.
+    if (plan.recommendations) {
+      plan.recommendations.forEach(r => {
+        const match = Object.entries(LIFT_NAMES).find(
+          ([id, name]) => name.toLowerCase() === (r.name || '').toLowerCase()
+        );
+        if (match) r.liftId = match[0];
+      });
+    }
 
     rampBackPlan = plan;
     renderRampBackModal(plan);
