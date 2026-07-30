@@ -1953,6 +1953,7 @@ window.applyRampBack = async function() {
 
   const settings = getGlobalSettings();
   const updates = [];
+  const pending = getPendingRampBack();
 
   for (const r of rampBackPlan.recommendations) {
     const roundedWeight = roundToIncrement(r.weight, settings.minIncrement);
@@ -1962,6 +1963,12 @@ window.applyRampBack = async function() {
     // benefit from the ramp back until you happen to run it again on that day.
     updates.push(upsertLiftState(user.id, r.liftId, { weight: roundedWeight, failures: 0 }));
     liftStates[r.liftId] = { ...liftStates[r.liftId], weight: roundedWeight, failures: 0 };
+
+    // Save the recommended set count for EVERY lift in the plan too, keyed
+    // by lift id rather than by today's session — this is what survives a
+    // day switch. A lift like squat that shows up on both A and B days
+    // should keep showing this guidance no matter which day it's hit on.
+    pending[r.liftId] = { sets: r.sets, note: r.note };
 
     // Only lifts actually in today's session get the live session override
     const idx = currentSession.liftResults.findIndex(lr => lr.liftId === r.liftId);
@@ -1977,6 +1984,8 @@ window.applyRampBack = async function() {
     lr.warmups = generateWarmups(roundedWeight, lr.barWeight).map(w => ({ ...w, done: false }));
     lr.failures = 0;
   }
+
+  savePendingRampBack(pending);
 
   await Promise.all(updates);
   saveDraftSession();
