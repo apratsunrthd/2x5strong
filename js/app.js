@@ -430,6 +430,20 @@ function initSession() {
     }))
   };
 
+  // Apply any pending ramp-back guidance for these lifts — this is what
+  // makes it survive switching from Workout A to B and back, since it's
+  // read from persisted storage rather than carried in memory.
+  const pendingRampBack = getPendingRampBack();
+  currentSession.liftResults.forEach(lr => {
+    const rec = pendingRampBack[lr.liftId];
+    if (rec) {
+      lr.isRampBack = true;
+      lr.recommendedSets = rec.sets;
+      // Sets array always stays at 5 slots (or deadlift's dynamic count) —
+      // the recommendation is a target shown in the headline, not a cap.
+    }
+  });
+
   renderWorkout();
 }
 
