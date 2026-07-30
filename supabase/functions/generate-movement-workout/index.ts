@@ -20,6 +20,17 @@ function snapWeights(workout: any, minIncrement: number): any {
   return workout;
 }
 
+// Extract the outermost {...} JSON object from a string, ignoring any
+// preamble or trailing text Claude might add despite instructions not to.
+function extractJson(text: string): string {
+  const start = text.indexOf('{');
+  const end = text.lastIndexOf('}');
+  if (start === -1 || end === -1 || end < start) {
+    throw new Error('No JSON object found in response');
+  }
+  return text.slice(start, end + 1);
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: CORS_HEADERS });
@@ -43,7 +54,10 @@ serve(async (req) => {
       },
       body: JSON.stringify({
         model: 'claude-sonnet-5',
-        max_tokens: 2048,
+        // Sonnet 5's adaptive thinking consumes part of this budget
+        // invisibly before any output text — bumped up to leave headroom
+        // for a full workout (up to 5 exercises + optional MetCon) on top.
+        max_tokens: 4096,
         messages: [{ role: 'user', content: prompt }],
       }),
     });
@@ -55,6 +69,10 @@ serve(async (req) => {
 
     const data = await response.json();
 
+    if (data.stop_reason === 'max_tokens') {
+      throw new Error('Response was cut off (max_tokens reached) before completing — try again');
+    }
+
     // Sonnet 5 has adaptive thinking on by default, so content[0] may be a
     // "thinking" block rather than "text" — find the actual text block instead
     // of assuming position.
@@ -64,8 +82,8 @@ serve(async (req) => {
     }
 
     const text = textBlock.text.trim();
-    const clean = text.replace(/```json|```/g, '').trim();
-    let workout = JSON.parse(clean);
+    const jsonStr = extractJson(text);
+    let workout = JSON.parse(jsonStr);
 
     workout = snapWeights(workout, minIncrement);
 

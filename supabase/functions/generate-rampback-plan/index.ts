@@ -10,6 +10,17 @@ function roundToIncrement(weight: number, increment: number): number {
   return Math.round(weight / increment) * increment;
 }
 
+// Extract the outermost {...} JSON object from a string, ignoring any
+// preamble or trailing text Claude might add despite instructions not to.
+function extractJson(text: string): string {
+  const start = text.indexOf('{');
+  const end = text.lastIndexOf('}');
+  if (start === -1 || end === -1 || end < start) {
+    throw new Error('No JSON object found in response');
+  }
+  return text.slice(start, end + 1);
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: CORS_HEADERS });
@@ -33,7 +44,11 @@ serve(async (req) => {
       },
       body: JSON.stringify({
         model: 'claude-sonnet-5',
-        max_tokens: 1536,
+        // Sonnet 5 has adaptive thinking on by default, which consumes part
+        // of this budget invisibly before any output text is generated.
+        // With 5 lifts worth of reasoning this was truncating mid-JSON at
+        // 1536 — bumped well above what thinking + a full response needs.
+        max_tokens: 4096,
         messages: [{ role: 'user', content: prompt }],
       }),
     });
@@ -45,6 +60,12 @@ serve(async (req) => {
 
     const data = await response.json();
 
+    // Surface truncation explicitly rather than letting JSON.parse fail
+    // with a confusing error further down.
+    if (data.stop_reason === 'max_tokens') {
+      throw new Error('Response was cut off (max_tokens reached) before completing — try again');
+    }
+
     // Sonnet 5 adaptive thinking means content[0] may not be text — find the text block
     const textBlock = data.content?.find((c: any) => c.type === 'text');
     if (!textBlock || !textBlock.text) {
@@ -52,8 +73,8 @@ serve(async (req) => {
     }
 
     const text = textBlock.text.trim();
-    const clean = text.replace(/```json|```/g, '').trim();
-    let plan = JSON.parse(clean);
+    const jsonStr = extractJson(text);
+    let plan = JSON.parse(jsonStr);
 
     // Snap all recommended weights to minIncrement in code
     if (plan.recommendations) {
