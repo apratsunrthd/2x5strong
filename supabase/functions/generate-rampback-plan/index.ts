@@ -21,6 +21,68 @@ function extractJson(text: string): string {
   return text.slice(start, end + 1);
 }
 
+// Validate each recommendation against real numbers instead of blindly
+// trusting Claude's output. A malformed/missing weight for one lift was
+// previously falling through to `minIncrement` (5lb) — nonsense for a
+// barbell lift — with sets similarly floored to 1. Now any recommendation
+// that fails a sanity check gets replaced with a safe, clearly-marked
+// fallback instead of silently passing through garbage.
+function validateRecommendations(
+  recommendations: any[],
+  minIncrement: number,
+  currentWeights: Record<string, number>,
+  lastFullWeights: Record<string, number>
+): any[] {
+  return recommendations.map((r: any) => {
+    const current = currentWeights[r.liftId];
+    const lastFull = lastFullWeights[r.liftId];
+    // Best available reference point for this lift, in priority order
+    const reference = lastFull || current;
+
+    let weight = Number(r.weight);
+    let sets = Math.round(Number(r.sets));
+    let flagged = false;
+
+    // A recommendation is "broken" if it's not a usable number, or if it's
+    // wildly outside any plausible range relative to what we know about
+    // this lift (below 40% or above 120% of the best reference weight).
+    const weightIsBroken =
+      !Number.isFinite(weight) ||
+      weight <= 0 ||
+      (reference && (weight < reference * 0.4 || weight > reference * 1.2));
+
+    const setsIsBroken = !Number.isFinite(sets) || sets < 1;
+
+    if (weightIsBroken) {
+      flagged = true;
+      // Fall back to a conservative, sane default: 85% of the best
+      // reference weight, rounded to increment — never below the
+      // increment itself, never a number that ignores real data.
+      weight = reference
+        ? Math.max(roundToIncrement(reference * 0.85, minIncrement), minIncrement)
+        : minIncrement * 9; // last-resort floor if we have zero reference data
+    } else {
+      weight = Math.max(roundToIncrement(weight, minIncrement), minIncrement);
+    }
+
+    if (setsIsBroken) {
+      flagged = true;
+      sets = 3; // reasonable safe middle ground, never a bare 0/1 default
+    } else {
+      sets = Math.max(1, Math.min(5, sets));
+    }
+
+    if (flagged) {
+      console.warn(`Ramp back: corrected malformed recommendation for ${r.liftId}`, r);
+      r.note = `(Adjusted — original AI recommendation was out of expected range) ${r.note || ''}`.trim();
+    }
+
+    r.weight = weight;
+    r.sets = sets;
+    return r;
+  });
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: CORS_HEADERS });
@@ -30,6 +92,8 @@ serve(async (req) => {
     const body = await req.json();
     const prompt = body.prompt;
     const minIncrement = body.minIncrement || 5;
+    const currentWeights = body.currentWeights || {};
+    const lastFullWeights = body.lastFullWeights || {};
 
     if (!prompt) {
       throw new Error('No prompt provided');
@@ -46,8 +110,6 @@ serve(async (req) => {
         model: 'claude-sonnet-5',
         // Sonnet 5 has adaptive thinking on by default, which consumes part
         // of this budget invisibly before any output text is generated.
-        // With 5 lifts worth of reasoning this was truncating mid-JSON at
-        // 1536 — bumped well above what thinking + a full response needs.
         max_tokens: 4096,
         messages: [{ role: 'user', content: prompt }],
       }),
@@ -60,13 +122,10 @@ serve(async (req) => {
 
     const data = await response.json();
 
-    // Surface truncation explicitly rather than letting JSON.parse fail
-    // with a confusing error further down.
     if (data.stop_reason === 'max_tokens') {
       throw new Error('Response was cut off (max_tokens reached) before completing — try again');
     }
 
-    // Sonnet 5 adaptive thinking means content[0] may not be text — find the text block
     const textBlock = data.content?.find((c: any) => c.type === 'text');
     if (!textBlock || !textBlock.text) {
       throw new Error('No text content found in Claude response');
@@ -76,13 +135,13 @@ serve(async (req) => {
     const jsonStr = extractJson(text);
     let plan = JSON.parse(jsonStr);
 
-    // Snap all recommended weights to minIncrement in code
     if (plan.recommendations) {
-      plan.recommendations = plan.recommendations.map((r: any) => {
-        r.weight = Math.max(roundToIncrement(r.weight, minIncrement), minIncrement);
-        r.sets = Math.max(1, Math.min(5, Math.round(r.sets)));
-        return r;
-      });
+      plan.recommendations = validateRecommendations(
+        plan.recommendations,
+        minIncrement,
+        currentWeights,
+        lastFullWeights
+      );
     }
 
     return new Response(JSON.stringify(plan), {
