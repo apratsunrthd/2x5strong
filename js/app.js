@@ -1918,6 +1918,18 @@ window.openRampBack = async function() {
     const settings = getGlobalSettings();
     lastRampBackPrompt = buildRampBackPrompt(gaps, settings.minIncrement);
 
+    // Send current stored weights and last-full weights as structured data
+    // (not just embedded in the prompt text) so the edge function can sanity
+    // check Claude's recommendations against real numbers, rather than just
+    // trusting whatever comes back — a malformed entry for one lift should
+    // never silently become "5 lb" or "1 set".
+    const currentWeights = {};
+    const lastFullWeights = {};
+    gaps.forEach(g => {
+      currentWeights[g.liftId] = g.currentWeight;
+      if (g.lastFull) lastFullWeights[g.liftId] = g.lastFull.weight;
+    });
+
     const { data: { session: authSession } } = await supabase.auth.getSession();
     const resp = await fetch(`${SUPABASE_FUNCTIONS_URL}/generate-rampback-plan`, {
       method: 'POST',
@@ -1925,7 +1937,12 @@ window.openRampBack = async function() {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${authSession.access_token}`,
       },
-      body: JSON.stringify({ prompt: lastRampBackPrompt, minIncrement: settings.minIncrement }),
+      body: JSON.stringify({
+        prompt: lastRampBackPrompt,
+        minIncrement: settings.minIncrement,
+        currentWeights,
+        lastFullWeights,
+      }),
     });
 
     if (!resp.ok) throw new Error('Function returned ' + resp.status);
