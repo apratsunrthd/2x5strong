@@ -248,6 +248,18 @@ async function init() {
   }
 
   showTab('workout');
+
+  // Restore an in-progress ramp back review that hadn't been applied yet —
+  // otherwise a refresh mid-review would silently discard your edits and
+  // force starting the whole plan over from scratch.
+  const rampDraft = loadRampBackDraft();
+  if (rampDraft && rampDraft.plan) {
+    rampBackPlan = rampDraft.plan;
+    lastRampBackPrompt = rampDraft.prompt || '';
+    document.getElementById('rampback-modal').classList.add('open');
+    renderRampBackModal(rampBackPlan);
+    toast('Ramp back review restored', 'success');
+  }
   document.getElementById('app-loading').style.display = 'none';
   document.getElementById('app-content').style.display = 'block';
 
@@ -1897,6 +1909,7 @@ window.openRampBack = async function() {
     }
 
     rampBackPlan = plan;
+    saveRampBackDraft();
     renderRampBackModal(plan);
 
   } catch (e) {
@@ -1942,6 +1955,7 @@ window.editRampBackWeight = function(idx) {
   const val = parseFloat(prompt('Weight for ' + r.name + ' (lb):', r.weight));
   if (isNaN(val) || val <= 0) return;
   r.weight = val;
+  saveRampBackDraft();
   renderRampBackModal(rampBackPlan);
 };
 
@@ -1950,8 +1964,48 @@ window.editRampBackSets = function(idx) {
   const val = parseInt(prompt('Sets for ' + r.name + ' (1-5):', r.sets));
   if (isNaN(val) || val < 1 || val > 5) return;
   r.sets = val;
+  saveRampBackDraft();
   renderRampBackModal(rampBackPlan);
 };
+
+// ── Ramp back MODAL draft persistence ─────────────────────────
+// The plan you're reviewing (and any edits made before hitting Apply)
+// lives only in memory otherwise — a refresh mid-review would silently
+// throw away your edits and force a full regeneration. Persist it the
+// same way the workout session itself is persisted.
+function getRampBackDraftKey() {
+  return '2x5strong_rampback_draft_' + (user ? user.id : 'anon');
+}
+
+function saveRampBackDraft() {
+  if (!user || !rampBackPlan) return;
+  try {
+    localStorage.setItem(getRampBackDraftKey(), JSON.stringify({
+      plan: rampBackPlan,
+      prompt: lastRampBackPrompt,
+      savedAt: Date.now(),
+    }));
+  } catch(e) { console.warn('Ramp back draft save failed:', e); }
+}
+
+function loadRampBackDraft() {
+  if (!user) return null;
+  try {
+    const raw = localStorage.getItem(getRampBackDraftKey());
+    if (!raw) return null;
+    const draft = JSON.parse(raw);
+    if (Date.now() - draft.savedAt > 24 * 60 * 60 * 1000) {
+      clearRampBackDraft();
+      return null;
+    }
+    return draft;
+  } catch(e) { return null; }
+}
+
+function clearRampBackDraft() {
+  if (!user) return;
+  localStorage.removeItem(getRampBackDraftKey());
+}
 
 window.toggleRampBackPrompt = function() {
   const body = document.getElementById('rampback-prompt-body');
@@ -1964,6 +2018,7 @@ window.toggleRampBackPrompt = function() {
 
 window.closeRampBack = function() {
   document.getElementById('rampback-modal').classList.remove('open');
+  clearRampBackDraft(); // explicit cancel means discard the pending review
 };
 
 window.applyRampBack = async function() {
