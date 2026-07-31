@@ -248,6 +248,18 @@ async function init() {
   }
 
   showTab('workout');
+
+  // Restore an in-progress ramp back review that hadn't been applied yet —
+  // otherwise a refresh mid-review would silently discard your edits and
+  // force starting the whole plan over from scratch.
+  const rampDraft = loadRampBackDraft();
+  if (rampDraft && rampDraft.plan) {
+    rampBackPlan = rampDraft.plan;
+    lastRampBackPrompt = rampDraft.prompt || '';
+    document.getElementById('rampback-modal').classList.add('open');
+    renderRampBackModal(rampBackPlan);
+    toast('Ramp back review restored', 'success');
+  }
   document.getElementById('app-loading').style.display = 'none';
   document.getElementById('app-content').style.display = 'block';
 
@@ -1724,12 +1736,31 @@ let rampBackPlan = null;
 
 // For each lift, find the most recent "true full" session (all sets recorded,
 // all at 5 reps) and the most recent session regardless of outcome.
+// Volume = weight x reps summed across all recorded work sets, plus any
+// completed warmup sets — gives Claude a fuller picture than pass/fail alone.
+function computeSessionVolume(liftEntry) {
+  const workSets = (liftEntry.sets_json || []).filter(v => v !== null && v !== 'locked');
+  const workVolume = workSets.reduce((acc, reps) => acc + (reps * liftEntry.weight), 0);
+  const warmupVolume = (liftEntry.warmups_json || [])
+    .filter(w => w.done)
+    .reduce((acc, w) => acc + (w.reps * w.weight), 0);
+  return { workVolume, warmupVolume, total: workVolume + warmupVolume };
+}
+
+function summarizeWarmups(liftEntry) {
+  const warmups = liftEntry.warmups_json || [];
+  if (warmups.length === 0) return null;
+  const completed = warmups.filter(w => w.done);
+  if (completed.length === 0) return 'none completed';
+  return completed.map(w => `${w.weight}lb x${w.reps}`).join(', ');
+}
+
 async function analyzeRampBackGaps() {
   const { getSessions } = await import('./db.js');
   const sessions = await getSessions(user.id, 100); // enough history to find full sessions
 
-  const lastFullByLift = {};   // lift_id -> { date, weight }
-  const mostRecentByLift = {}; // lift_id -> { date, weight, sets (array of reps) }
+  const lastFullByLift = {};   // lift_id -> { date, weight, volume }
+  const mostRecentByLift = {}; // lift_id -> { date, weight, sets, volume, warmupSummary }
 
   // Sessions come back newest-first
   for (const s of sessions) {
@@ -1737,14 +1768,22 @@ async function analyzeRampBackGaps() {
       if ((l.lift_id || '').startsWith('movement_')) continue; // skip legacy movement data
 
       if (!mostRecentByLift[l.lift_id]) {
-        mostRecentByLift[l.lift_id] = { date: s.completed_at, weight: l.weight, sets: l.sets_json || [] };
+        const vol = computeSessionVolume(l);
+        mostRecentByLift[l.lift_id] = {
+          date: s.completed_at,
+          weight: l.weight,
+          sets: l.sets_json || [],
+          volume: vol.total,
+          warmupSummary: summarizeWarmups(l),
+        };
       }
 
       if (!lastFullByLift[l.lift_id]) {
         const recorded = (l.sets_json || []).filter(v => v !== null && v !== 'locked');
         const isFull = recorded.length > 0 && recorded.length === (l.sets_json || []).length && recorded.every(v => v === 5);
         if (isFull) {
-          lastFullByLift[l.lift_id] = { date: s.completed_at, weight: l.weight };
+          const vol = computeSessionVolume(l);
+          lastFullByLift[l.lift_id] = { date: s.completed_at, weight: l.weight, volume: vol.total };
         }
       }
     }
@@ -1802,16 +1841,25 @@ function buildRampBackPrompt(gaps, minIncrement) {
       else if (daysSinceFull >= 7) layoffTier = 'MILD — about a week since a true full 5x5';
     }
 
+    const lastFullVolStr = g.lastFull && g.lastFull.volume ? `, total volume ${Math.round(g.lastFull.volume).toLocaleString()}lb` : '';
     const lastFullStr = g.lastFull
-      ? `Last confirmed full 5x5: ${g.lastFull.weight}lb, ${daysSinceFull} days ago. LAYOFF SEVERITY: ${layoffTier}.`
+      ? `Last confirmed full 5x5: ${g.lastFull.weight}lb${lastFullVolStr}, ${daysSinceFull} days ago. LAYOFF SEVERITY: ${layoffTier}.`
       : 'No confirmed full 5x5 on record — treat conservatively, no proven baseline.';
 
     const recentSets = (g.mostRecent.sets || []).filter(v => v !== null && v !== 'locked');
+    const recentVolStr = g.mostRecent.volume ? `, total volume ${Math.round(g.mostRecent.volume).toLocaleString()}lb` : '';
     const recentStr = recentSets.length > 0
-      ? `Most recent session (${daysSinceRecent} days ago): ${g.mostRecent.weight}lb, reps per set: [${recentSets.join(', ')}]`
-      : `Most recent session (${daysSinceRecent} days ago): ${g.mostRecent.weight}lb, no completed sets recorded`;
+      ? `Most recent session (${daysSinceRecent} days ago): ${g.mostRecent.weight}lb, reps per set: [${recentSets.join(', ')}]${recentVolStr}`
+      : `Most recent session (${daysSinceRecent} days ago): ${g.mostRecent.weight}lb, no completed sets recorded${recentVolStr}`;
 
-    return `${g.name}:\n  Current stored target weight: ${g.currentWeight}lb (do NOT treat this as proven — it may be stale from before a layoff)\n  ${lastFullStr}\n  ${recentStr}`;
+    // Warmup completion is a useful signal too — someone who only did light
+    // warmups (or skipped them) before a session may have been more
+    // cautious or more fatigued than the raw work-set numbers alone show.
+    const warmupStr = g.mostRecent.warmupSummary
+      ? `Warmups completed that session: ${g.mostRecent.warmupSummary}`
+      : 'No warmup data recorded for that session';
+
+    return `${g.name}:\n  Current stored target weight: ${g.currentWeight}lb (do NOT treat this as proven — it may be stale from before a layoff)\n  ${lastFullStr}\n  ${recentStr}\n  ${warmupStr}`;
   }).join('\n\n');
 
   return `You are a strength coach helping an athlete safely rebuild back to a standard 5 sets x 5 reps barbell program after a layoff or a rough patch. The goal is STRENGTH — get them back to full 5x5 as efficiently as is SAFE.
@@ -1828,7 +1876,9 @@ Rules — follow layoff severity strictly:
 3. MILD layoff (7-13 days): close to full weight, 4-5 sets.
 4. Minimal layoff / recent full pass: use the CURRENT STORED TARGET WEIGHT as-is, full 5 sets. If they just cleanly passed a full 5x5, the stored target has ALREADY been advanced by normal progression to the correct next weight — do not revert to the old pre-progression number, that would undo real progress.
 5. If their most recent actual session already shows failed reps at a given weight, weight this more heavily than the layoff tier — don't recommend a weight they just failed.
-6. One sentence of reasoning per lift that references the actual days-since-full number.
+6. Volume trends matter: a much lower total volume in the most recent session vs. the last full 5x5 (even with matching reps) can indicate the weight is being felt more than the numbers alone show — factor this into how conservative to be.
+7. Warmup data is a secondary signal: if warmups were skipped or unusually light before a session, that MAY indicate more caution or time pressure, not necessarily reduced capacity — use it to inform tone/confidence in your note, not as a hard rule.
+8. One sentence of reasoning per lift that references the actual days-since-full number.
 
 Respond ONLY with valid JSON, no preamble, no markdown fences:
 {
@@ -1897,6 +1947,7 @@ window.openRampBack = async function() {
     }
 
     rampBackPlan = plan;
+    saveRampBackDraft();
     renderRampBackModal(plan);
 
   } catch (e) {
@@ -1942,6 +1993,7 @@ window.editRampBackWeight = function(idx) {
   const val = parseFloat(prompt('Weight for ' + r.name + ' (lb):', r.weight));
   if (isNaN(val) || val <= 0) return;
   r.weight = val;
+  saveRampBackDraft();
   renderRampBackModal(rampBackPlan);
 };
 
@@ -1950,8 +2002,48 @@ window.editRampBackSets = function(idx) {
   const val = parseInt(prompt('Sets for ' + r.name + ' (1-5):', r.sets));
   if (isNaN(val) || val < 1 || val > 5) return;
   r.sets = val;
+  saveRampBackDraft();
   renderRampBackModal(rampBackPlan);
 };
+
+// ── Ramp back MODAL draft persistence ─────────────────────────
+// The plan you're reviewing (and any edits made before hitting Apply)
+// lives only in memory otherwise — a refresh mid-review would silently
+// throw away your edits and force a full regeneration. Persist it the
+// same way the workout session itself is persisted.
+function getRampBackDraftKey() {
+  return '2x5strong_rampback_draft_' + (user ? user.id : 'anon');
+}
+
+function saveRampBackDraft() {
+  if (!user || !rampBackPlan) return;
+  try {
+    localStorage.setItem(getRampBackDraftKey(), JSON.stringify({
+      plan: rampBackPlan,
+      prompt: lastRampBackPrompt,
+      savedAt: Date.now(),
+    }));
+  } catch(e) { console.warn('Ramp back draft save failed:', e); }
+}
+
+function loadRampBackDraft() {
+  if (!user) return null;
+  try {
+    const raw = localStorage.getItem(getRampBackDraftKey());
+    if (!raw) return null;
+    const draft = JSON.parse(raw);
+    if (Date.now() - draft.savedAt > 24 * 60 * 60 * 1000) {
+      clearRampBackDraft();
+      return null;
+    }
+    return draft;
+  } catch(e) { return null; }
+}
+
+function clearRampBackDraft() {
+  if (!user) return;
+  localStorage.removeItem(getRampBackDraftKey());
+}
 
 window.toggleRampBackPrompt = function() {
   const body = document.getElementById('rampback-prompt-body');
@@ -1964,6 +2056,7 @@ window.toggleRampBackPrompt = function() {
 
 window.closeRampBack = function() {
   document.getElementById('rampback-modal').classList.remove('open');
+  clearRampBackDraft(); // explicit cancel means discard the pending review
 };
 
 window.applyRampBack = async function() {

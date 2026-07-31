@@ -63,7 +63,8 @@ export async function getSessions(userId, limit = 50) {
         lift_name,
         weight,
         sets_json,
-        sets_passed
+        sets_passed,
+        warmups_json
       ),
       accessory_logs (
         exercise_name,
