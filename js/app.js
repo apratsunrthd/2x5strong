@@ -318,8 +318,8 @@ function applySessionDeload() {
   const settings = getGlobalSettings();
   currentSession.liftResults.forEach(lr => {
     lr.weight = roundToIncrement(Math.round(lr.weight * 0.9 / 2.5) * 2.5, settings.minIncrement);
-    // Regenerate warmups with new weight
-    lr.warmups = generateWarmups(lr.weight, lr.barWeight).map(w => ({ ...w, done: false }));
+    // Regenerate warmups with new weight, keeping any already done
+    lr.warmups = regenerateWarmups(lr.warmups, lr.weight, lr.barWeight);
   });
   currentSession.isSessionDeload = true;
   renderWorkout();
@@ -407,6 +407,22 @@ function generateWarmups(workingWeight, barWeight) {
     kept.push(c);
   }
   return kept;
+}
+
+// Recompute warmups for a new working weight without discarding sets already
+// marked done — matched by position, since warmups are worked in ascending
+// order. A mid-session weight edit (or deload/ramp-back re-apply) should only
+// touch the steps you haven't done yet.
+function regenerateWarmups(oldWarmups, workingWeight, barWeight) {
+  const fresh = generateWarmups(workingWeight, barWeight).map(w => ({ ...w, done: false }));
+  const merged = [];
+  const maxLen = Math.max(oldWarmups.length, fresh.length);
+  for (let i = 0; i < maxLen; i++) {
+    const old = oldWarmups[i];
+    if (old && old.done) merged.push(old);
+    else if (fresh[i]) merged.push(fresh[i]);
+  }
+  return merged;
 }
 
 // ── Session init ──────────────────────────────────────────────
@@ -540,7 +556,7 @@ window.renderWorkout = function() {
               <span class="warmup-check">${w.done ? '✓' : ''}</span>
             </button>
             <span class="warmup-weight" onclick="editWarmupWeight(${idx},${wi})" title="Tap to edit">${w.weight}<span class="warmup-unit">lb</span></span>
-            <span class="warmup-reps">${w.reps} rep${w.reps !== 1 ? 's' : ''}</span>
+            <span class="warmup-reps" onclick="editWarmupReps(${idx},${wi})" title="Tap to edit">${w.reps} rep${w.reps !== 1 ? 's' : ''}</span>
           </div>`
         ).join('')}</div>
       </div>
@@ -550,11 +566,14 @@ window.renderWorkout = function() {
       if (s === 'locked') {
         return `<button class="set-btn locked" disabled aria-label="Set ${si+1} locked">—</button>`;
       }
+      // A ramp-back set beyond the recommended count is bonus/optional —
+      // dim it (until actually recorded) so it reads as "not required".
+      const isOptional = lr.isRampBack && s === null && si >= (lr.recommendedSets ?? lr.sets.length);
       // Determine button class and label
       let cls = 'set-btn';
       let label = String(si + 1); // default: set number when unrecorded
       if (s === null) {
-        cls = 'set-btn';
+        cls = isOptional ? 'set-btn optional' : 'set-btn';
         label = String(si + 1);
       } else if (s === 5) {
         cls = 'set-btn done';
@@ -566,7 +585,7 @@ window.renderWorkout = function() {
         cls = 'set-btn partial';
         label = String(s);
       }
-      return `<button class="${cls}" onclick="cycleSet(${idx},${si})" aria-label="Set ${si+1}: ${s === null ? 'not recorded' : s + ' reps'}">${label}</button>`;
+      return `<button class="${cls}" onclick="cycleSet(${idx},${si})" aria-label="Set ${si+1}: ${s === null ? 'not recorded' : s + ' reps'}${isOptional ? ' (optional)' : ''}">${label}</button>`;
     }).join('');
 
     // Summary: total reps out of 25
@@ -662,6 +681,16 @@ window.editWarmupWeight = function(liftIdx, warmupIdx) {
   renderWorkout();
 };
 
+window.editWarmupReps = function(liftIdx, warmupIdx) {
+  const lr = currentSession.liftResults[liftIdx];
+  const w = lr.warmups[warmupIdx];
+  const val = parseInt(prompt('Warmup reps done:', w.reps), 10);
+  if (isNaN(val) || val < 0) return;
+  w.reps = val;
+  saveDraftSession();
+  renderWorkout();
+};
+
 window.editLiftWeight = async function(liftIdx) {
   const lr = currentSession.liftResults[liftIdx];
   const val = parseFloat(prompt(`Weight for ${lr.name} (lb):`, lr.weight));
@@ -670,9 +699,10 @@ window.editLiftWeight = async function(liftIdx) {
   const settings = getGlobalSettings();
   const rounded = roundToIncrement(val, settings.minIncrement);
 
-  // Update current session
+  // Update current session — keep any warmup sets already done, only
+  // recompute the ones still pending
   lr.weight = rounded;
-  lr.warmups = generateWarmups(rounded, lr.barWeight).map(w => ({ ...w, done: false }));
+  lr.warmups = regenerateWarmups(lr.warmups, rounded, lr.barWeight);
 
   // Save to profile
   await upsertLiftState(user.id, lr.liftId, { weight: rounded, failures: 0 });
@@ -829,10 +859,19 @@ window.confirmFinish = async function() {
           // it persists across every day switch until this actually happens.
           clearPendingRampBackForLift(lr.liftId);
         } else if (metRecommendedTarget) {
-          // Hit the plan exactly as recommended — hold weight, no penalty.
-          // Guidance stays in place so it shows again next time, whichever
-          // day this lift next comes up on.
+          // Hit the plan exactly as recommended — weight holds, but the
+          // recommended SET COUNT steps up by one for next time so this is
+          // actually a ramp rather than the same target repeating forever.
+          // It keeps climbing toward lr.sets.length (a genuine full load),
+          // which is what finally graduates the lift out via the allFive
+          // branch above.
           newFailures = 0;
+          const pending = getPendingRampBack();
+          const rec = pending[lr.liftId];
+          if (rec) {
+            rec.sets = Math.min(lr.sets.length, (rec.sets || lr.recommendedSets || 1) + 1);
+            savePendingRampBack(pending);
+          }
         }
         // else: fell short of even the reduced target — also no penalty,
         // guidance stays in place, just leave state as-is.
@@ -2110,7 +2149,7 @@ window.applyRampBack = async function() {
     lr.sets = Array(5).fill(null);
     lr.recommendedSets = r.sets;
     lr.isRampBack = true;
-    lr.warmups = generateWarmups(roundedWeight, lr.barWeight).map(w => ({ ...w, done: false }));
+    lr.warmups = regenerateWarmups(lr.warmups, roundedWeight, lr.barWeight);
     lr.failures = 0;
   }
 
