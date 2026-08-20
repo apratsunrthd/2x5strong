@@ -172,6 +172,8 @@
     .set-btn.fail { background: var(--danger); border-color: var(--danger); color: #fff; }
     .set-btn.partial { background: var(--accent-bg); border-color: var(--accent-dim); color: var(--accent); }
     .set-btn.locked { background: transparent; border-color: var(--border); color: var(--muted2); cursor: not-allowed; opacity: 0.4; }
+    .set-btn.optional { border-style: dashed; opacity: 0.5; }
+    .set-btn.optional:hover { opacity: 0.85; }
     .lift-card.lift-locked { border-color: var(--muted2); opacity: 0.75; }
 
 
@@ -735,7 +737,10 @@
     .warmup-reps {
       font-size: 13px;
       color: var(--muted2);
+      cursor: pointer;
+      border-bottom: 1px dashed transparent;
     }
+    .warmup-reps:hover { color: var(--accent); border-bottom-color: var(--accent); }
     .warmup-done .warmup-reps { color: var(--muted); }
     .sets-count {
       font-size: 12px;
