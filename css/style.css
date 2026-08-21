@@ -7,24 +7,28 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
-  --bg: #0e0e0e;
-  --surface: #171717;
-  --surface2: #1f1f1f;
-  --surface3: #272727;
-  --border: #2a2a2a;
-  --border2: #363636;
-  --accent: #e8d44d;
-  --accent-dim: #b8a93a;
-  --accent-bg: rgba(232,212,77,0.08);
-  --text: #f0ede6;
-  --muted: #888;
-  --muted2: #555;
-  --danger: #e05252;
-  --danger-bg: rgba(224,82,82,0.1);
-  --success: #52c97a;
-  --success-bg: rgba(82,201,122,0.1);
-  --info: #5297e0;
-  --info-bg: rgba(82,151,224,0.1);
+  --bg: #161311;
+  --surface: #1E1A17;
+  --surface2: #262019;
+  --surface3: #332C24;
+  --border: #332C24;
+  --border2: #443A2E;
+  --accent: #D68B4A;
+  --accent-dim: #B87A3E;
+  --accent-bg: rgba(214,139,74,0.08);
+  --text: #F2EEE8;
+  --muted: #948C81;
+  --muted2: #6B6255;
+  --danger: #D6604F;
+  --danger-bg: rgba(214,96,79,0.1);
+  --success: #6B9071;
+  --success-bg: rgba(107,144,113,0.12);
+  /* "info" is this app's gentle-warning tone — used for deload/ramp-back
+     states specifically. Deliberately a slate-periwinkle, not amber/red:
+     scaling back after a layoff isn't a failure, so it can't share a hue
+     with anything that reads as an alarm. See DESIGN.md. */
+  --info: #8B8FC4;
+  --info-bg: rgba(139,143,196,0.12);
   --font-d: 'Barlow Condensed', sans-serif;
   --font-b: 'Barlow', sans-serif;
   --radius: 12px;

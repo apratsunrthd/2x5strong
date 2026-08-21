@@ -1,6 +1,8 @@
-# 2x5 Strong
+# Never Behind
 
-A strength training app for well-rounded athletes — two lifting days, four days free for cycling, running, or swimming. Built on the 5×5 principle with automatic progression, plateau detection, and deload cycles.
+A strength training app for well-rounded athletes — two lifting days, four days free for cycling, running, or swimming. Built on the 5×5 principle with automatic progression, plateau detection, and deload cycles that treat a scaled-back session as normal, not a setback.
+
+> Repo/folder name below is still `2x5strong` (unchanged — renaming the actual GitHub repo is a separate, more disruptive step not done as part of this rebrand). The product itself is now Never Behind.
 
 ## Features
 
