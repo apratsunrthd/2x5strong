@@ -34,3 +34,6 @@ enable_confirmations = true
 
 [functions.generate-movement-workout]
 verify_jwt = true
+
+[functions.generate-rampback-plan]
+verify_jwt = true
