@@ -3,8 +3,10 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>2x5 Strong — Login</title>
+  <title>Never Behind — Login</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <link rel="stylesheet" href="css/style.css">
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;1,9..144,500&display=swap" rel="stylesheet">
   <style>
     .auth-page {
       min-height: 100vh;
@@ -16,19 +18,19 @@
     }
 
     .auth-logo {
-      font-family: var(--font-d);
-      font-size: 42px;
-      font-weight: 900;
-      letter-spacing: 2px;
-      color: var(--accent);
+      font-family: 'Fraunces', Georgia, serif;
+      font-size: 38px;
+      font-weight: 500;
+      letter-spacing: -0.01em;
+      color: var(--text);
       margin-bottom: 6px;
       text-align: center;
       display: flex;
       align-items: center;
       justify-content: center;
-      gap: 12px;
+      gap: 14px;
     }
-    .auth-logo span { color: var(--muted); font-weight: 400; }
+    .auth-logo em { color: var(--accent); font-style: italic; }
     .auth-logo-icon { flex-shrink: 0; }
 
     .auth-tagline {
@@ -162,26 +164,10 @@
 <body>
 
 <div class="auth-page">
-  <div class="auth-logo"><svg class="auth-logo-icon" viewBox="0 0 100 100" width="56" height="56">
-    <ellipse cx="22" cy="38" rx="7" ry="9" fill="#e8d44d" transform="rotate(-25 22 38)"/>
-    <ellipse cx="78" cy="38" rx="7" ry="9" fill="#e8d44d" transform="rotate(25 78 38)"/>
-    <path d="M28 34 Q14 28 12 14 Q12 9 17 10 Q22 12 22 20 Q23 28 34 36 Z" fill="#f0ede6"/>
-    <path d="M72 34 Q86 28 88 14 Q88 9 83 10 Q78 12 78 20 Q77 28 66 36 Z" fill="#f0ede6"/>
-    <path d="M38 20 Q50 10 62 20 Q56 24 50 22 Q44 24 38 20 Z" fill="#e8d44d"/>
-    <path d="M50 24 C 30 24, 18 40, 18 56 C 18 68, 24 76, 32 80 C 32 84, 34 88, 38 88 L 62 88 C 66 88, 68 84, 68 80 C 76 76, 82 68, 82 56 C 82 40, 70 24, 50 24 Z" fill="#e8d44d"/>
-    <ellipse cx="24" cy="60" rx="8" ry="12" fill="#e8d44d"/>
-    <ellipse cx="76" cy="60" rx="8" ry="12" fill="#e8d44d"/>
-    <path d="M50 58 C 36 58, 30 66, 30 74 C 30 82, 38 88, 50 88 C 62 88, 70 82, 70 74 C 70 66, 64 58, 50 58 Z" fill="#f0ede6"/>
-    <circle cx="37" cy="48" r="4.5" fill="#171717"/>
-    <circle cx="63" cy="48" r="4.5" fill="#171717"/>
-    <circle cx="38.5" cy="46.5" r="1.4" fill="#f0ede6"/>
-    <circle cx="64.5" cy="46.5" r="1.4" fill="#f0ede6"/>
-    <path d="M31 42 Q37 39 43 42" stroke="#c8a828" stroke-width="2" fill="none" stroke-linecap="round"/>
-    <path d="M57 42 Q63 39 69 42" stroke="#c8a828" stroke-width="2" fill="none" stroke-linecap="round"/>
-    <ellipse cx="43" cy="76" rx="3.2" ry="4.5" fill="#171717"/>
-    <ellipse cx="57" cy="76" rx="3.2" ry="4.5" fill="#171717"/>
-    <path d="M42 84 Q50 88 58 84" stroke="#171717" stroke-width="2" fill="none" stroke-linecap="round" opacity="0.5"/>
-  </svg><div>2X5 <span>STRONG</span></div></div>
+  <div class="auth-logo"><svg class="auth-logo-icon" viewBox="0 0 64 64" width="48" height="48">
+    <circle cx="18" cy="42" r="13" fill="#D68B4A"/>
+    <circle cx="40" cy="22" r="21" fill="#D68B4A"/>
+  </svg><div><em>Never</em> Behind</div></div>
   <p class="auth-tagline">Two days lifting. Four days moving. Strength built around your full life.</p>
 
   <div class="auth-box">
