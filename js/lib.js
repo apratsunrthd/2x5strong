@@ -48,10 +48,13 @@ export function consecutiveFails(sets) {
 }
 
 // Parse the max reps from a range string like "10-12" → 12, or "10" → 10.
-// Falls back to 10 when nothing parses (e.g. "amrap") — Math.max() on an
-// empty array is -Infinity, which is truthy, so `|| 10` alone doesn't catch it.
+// Falls back to 10 when nothing parses (e.g. "amrap", "") — Math.max() on an
+// empty array is -Infinity, which is truthy, so `|| 10` alone doesn't catch it,
+// and Number('') is 0 (not NaN), so an empty string needs its own guard.
 export function parseMaxReps(repsStr) {
-  const parts = String(repsStr).split('-').map(Number).filter(n => !isNaN(n));
+  const str = String(repsStr).trim();
+  if (!str) return 10;
+  const parts = str.split('-').map(Number).filter(n => !isNaN(n));
   return parts.length ? Math.max(...parts) : 10;
 }
 

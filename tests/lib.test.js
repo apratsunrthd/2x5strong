@@ -76,6 +76,9 @@ describe('consecutiveFails', () => {
   it('returns 0 for an all-null (untouched) session', () => {
     expect(consecutiveFails([null, null, null])).toBe(0);
   });
+  it('returns 0 for an empty sets array', () => {
+    expect(consecutiveFails([])).toBe(0);
+  });
 });
 
 describe('parseMaxReps', () => {
@@ -87,6 +90,10 @@ describe('parseMaxReps', () => {
   });
   it('falls back to 10 when nothing parses', () => {
     expect(parseMaxReps('amrap')).toBe(10);
+  });
+  it('falls back to 10 for an empty or whitespace-only string', () => {
+    expect(parseMaxReps('')).toBe(10);
+    expect(parseMaxReps('  ')).toBe(10);
   });
 });
 

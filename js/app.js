@@ -7,7 +7,7 @@ import { getSession, signOut, ensureLiftStates } from './auth.js';
 import { getProfile, getLiftStates, upsertLiftState, saveSession, getPersonalRecords, saveMovementSession } from './db.js';
 import {
   DEADLIFT_HEAVY_THRESHOLD, formatTime, roundToIncrement, effectiveIncrement,
-  deadliftSetsCount, deadliftIncrement, setFailed, setDone, consecutiveFails,
+  deadliftSetsCount, deadliftIncrement, setFailed,
   parseMaxReps, cycleMovementRep,
 } from './lib.js';
 
@@ -2131,7 +2131,6 @@ let movementLockedExercises = {}; // { index: exerciseObj } — locked in place 
 let lastMovementPrompt = '';    // for "show prompt" feature
 let includeMetcon = true;       // whether to include a MetCon finisher
 let rerolledExerciseNames = new Set(); // exercises generated this session — never reappear on reroll
-
 
 // Build the prompt, used both for generation and "show prompt"
 function buildMovementPrompt(weights, recentSummary, minIncrement, lockedExercises, daysSinceLast, includeMetcon, recentMovementExercises = [], rerolledNames = new Set()) {
