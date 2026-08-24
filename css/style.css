@@ -29,7 +29,7 @@
      scaling back after a layoff isn't a failure, so it can't share a hue
      with anything that reads as an alarm. See DESIGN.md. */
   --info: #5A60AB;
-  --info-bg: rgba(139,143,196,0.12);
+  --info-bg: rgba(90,96,171,0.12);
   --font-d: 'Fraunces', Georgia, serif;
   --font-b: 'Instrument Sans', system-ui, sans-serif;
   --font-m: 'Geist', system-ui, sans-serif;
