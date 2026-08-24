@@ -5,6 +5,11 @@
 import { supabase } from './supabase.js';
 import { getSession, signOut, ensureLiftStates } from './auth.js';
 import { getProfile, getLiftStates, upsertLiftState, saveSession, getPersonalRecords, saveMovementSession } from './db.js';
+import {
+  DEADLIFT_HEAVY_THRESHOLD, formatTime, roundToIncrement, effectiveIncrement,
+  deadliftSetsCount, deadliftIncrement, setFailed,
+  parseMaxReps, cycleMovementRep,
+} from './lib.js';
 
 // ── Program Definition ────────────────────────────────────────
 
@@ -54,12 +59,6 @@ function updateTimerDisplay() {
     document.getElementById('timer-rest-label').style.display = 'flex';
     document.getElementById('timer-divider-rest').style.display = 'block';
   }
-}
-
-function formatTime(secs) {
-  const m = Math.floor(secs / 60).toString().padStart(2, '0');
-  const s = (secs % 60).toString().padStart(2, '0');
-  return `${m}:${s}`;
 }
 
 function recordSetTime() {
@@ -174,15 +173,6 @@ function loadDraftSession() {
 function clearDraftSession() {
   if (!user) return;
   localStorage.removeItem(SESSION_DRAFT_KEY + '_' + user.id);
-}
-
-function roundToIncrement(weight, minIncrement) {
-  return Math.round(weight / minIncrement) * minIncrement;
-}
-
-// Effective increment for a lift: natural increment floored up to minIncrement
-function effectiveIncrement(naturalIncrement, minIncrement) {
-  return Math.max(naturalIncrement, minIncrement);
 }
 
 // ── Toast helper ──────────────────────────────────────────────
@@ -364,19 +354,6 @@ function isLight(hex) {
   return (r*299 + g*587 + b*114) / 1000 > 128;
 }
 
-// ── Deadlift progression rules ───────────────────────────────
-// Under 225lb: 5×5, +10lb per session
-// 225lb and over: 1×5, +5lb per session
-const DEADLIFT_HEAVY_THRESHOLD = 225;
-
-function deadliftSetsCount(weight) {
-  return weight >= DEADLIFT_HEAVY_THRESHOLD ? 1 : 5;
-}
-
-function deadliftIncrement(weight) {
-  return weight >= DEADLIFT_HEAVY_THRESHOLD ? 5 : 10;
-}
-
 // ── Warmup set generator ──────────────────────────────────────
 // Returns array of { weight, reps } for warmup sets.
 // Skips any step within MIN_GAP lb of bar, working weight, or each other.
@@ -473,23 +450,6 @@ function initSession() {
   });
 
   renderWorkout();
-}
-
-// ── Rep counting helpers ──────────────────────────────────────
-
-// A set is "failed" if it was recorded and got fewer than 5 reps
-function setFailed(val) { return val !== null && val < 5; }
-function setDone(val)   { return val === 5; }
-
-// Count consecutive failed sets from the end of recorded sets
-function consecutiveFails(sets) {
-  let count = 0;
-  for (let i = sets.length - 1; i >= 0; i--) {
-    if (sets[i] === null) break;      // unrecorded — stop
-    if (setFailed(sets[i])) count++;
-    else break;                        // a passing set breaks the streak
-  }
-  return count;
 }
 
 // After recording a set, check if 3 consecutive fails have occurred
@@ -2183,19 +2143,6 @@ let movementLockedExercises = {}; // { index: exerciseObj } — locked in place 
 let lastMovementPrompt = '';    // for "show prompt" feature
 let includeMetcon = true;       // whether to include a MetCon finisher
 let rerolledExerciseNames = new Set(); // exercises generated this session — never reappear on reroll
-
-// Parse the max reps from a range string like "10-12" → 12, or "10" → 10
-function parseMaxReps(repsStr) {
-  const parts = String(repsStr).split('-').map(Number);
-  return Math.max(...parts.filter(n => !isNaN(n))) || 10;
-}
-
-// Cycle: null → maxReps → maxReps-1 → ... → 0 → null
-function cycleMovementRep(current, maxReps) {
-  if (current === null) return maxReps;
-  if (current === 0)    return null;
-  return current - 1;
-}
 
 // Build the prompt, used both for generation and "show prompt"
 function buildMovementPrompt(weights, recentSummary, minIncrement, lockedExercises, daysSinceLast, includeMetcon, recentMovementExercises = [], rerolledNames = new Set()) {

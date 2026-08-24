@@ -10,28 +10,29 @@
 Renamed from "2x5strong" to **Never Behind**. Prior name paralleled StrongLifts 5x5's own naming pattern (numbers + "strong"/"5x5") closely enough to carry real trademark-confusion risk, especially once the app's positioning explicitly compares itself to StrongLifts. "Never Behind" was chosen after several rounds of conflict-checking candidate names against existing fitness apps/gyms — see session history for the full elimination process (Setpoint, Baseline, Tempered, Onward, Momentum, Regain, "Pick It Up," and others were all found to collide with real existing products).
 
 ## Aesthetic Direction
-- **Direction:** Dark, warm instrument panel. A precision tool with a coach's voice, not a system alert — not gym-bravado (StrongLifts/Strong: bold red/navy, oversized "LIFT MORE" headlines, achievement stat-walls), not clinical wellness (Oura: cream, blur, spa-quiet).
-- **Decoration level:** Minimal. Typography and one accent color carry the whole system. No texture, no gradients, no icon-in-circle grids, no stat-flexing or streak/gamification chrome anywhere.
+- **Direction:** Warm light — a premium training journal, not a system alert. Not gym-bravado (StrongLifts/Strong: bold red/navy, oversized "LIFT MORE" headlines, achievement stat-walls), not clinical wellness (Oura: cream, blur, spa-quiet). Sand and white with copper as the single accent.
+- **Decoration level:** Minimal. Typography and one accent color carry the whole system. No texture, no gradients, no stat-flexing or streak/gamification chrome anywhere. Exercise icons are optional — if used, they must be simple line-weight icons (Lucide or Phosphor), never illustrative or emoji-style.
 - **Mood:** "It doesn't judge me for a bad day." Calm, competent, matter-of-fact — a coach who's seen a thousand off days and isn't rattled by yours.
 - **Reference sites:** stronglifts.com, strong.app (category baseline — gym-bravado, explicitly rejected as the register), ouraring.com (adjacent-but-wrong register — too clinical/passive for a barbell tool; informed the "warm, not cold" correction).
+- **Approved mockup:** [`docs/design/variant-LC.png`](docs/design/variant-LC.png) — use this as the visual reference for implementation.
 
 ## Typography
 - **Display/Hero:** Fraunces — warm old-style serif, **medium weight (500) only, never heavy/black**. A heavy Fraunces reads self-important, which undercuts the whole point.
 - **Body/UI/Labels:** Instrument Sans — humanist, warm in the curves, reads well in dense logs without going clinical.
 - **Data/Tables (weights, reps):** Geist with tabular-nums. Non-negotiable — the entire app is numbers in columns, and they must align.
 - **Loading:** Google Fonts (`fonts.googleapis.com`) — `Fraunces`, `Instrument+Sans`, `Geist`.
-- **Current implementation status:** the shared `css/style.css` root stylesheet still uses Barlow Condensed / Barlow (`--font-d` / `--font-b`) — this was a deliberate scope decision during the rebrand session (color/token swap is low-risk; a full font migration touches weight/letter-spacing/uppercase rules throughout `app.html`'s ~2600-line embedded stylesheet and needs its own careful pass, not a blind swap). Fraunces is live today only on the login page's wordmark (`index.html`). **Full font migration across the app is the next design task — run `/design-html` to implement it against this spec.**
+- **Current implementation status:** the font migration described above has shipped — `css/style.css` and `app.html` now use Fraunces / Instrument Sans / Geist (`--font-d` / `--font-b` / `--font-m`) app-wide, not just on the login wordmark.
 
 ## Color
 - **Approach:** Restrained — one accent, semantic colors reserved for real meaning.
-- **Background:** `#161311` — warm charcoal, not cold steel, not pure black.
-- **Surface:** `#1E1A17` (cards) / `#262019` (secondary bands) / `#332C24` (tertiary/borders-strong).
-- **Text:** `#F2EEE8` primary / `#948C81` muted / `#6B6255` faint.
-- **Accent (brand/interactive):** `#D68B4A` — warm copper. Confident, not gym-red, not SaaS-purple.
-- **Success:** `#6B9071` — muted moss, no neon/confetti energy.
-- **Gentle warning (deload / ramp-back — semantically distinct from real errors):** `#8B8FC4` — dusty slate-periwinkle. **Deliberately outside the entire amber-red "caution" family.** Two independent AI design reviewers (Claude subagent, Codex/GPT-5.1) converged on this same idea unprompted during the design session — treat that convergence as a strong signal, not a coincidence. In code this reuses the `--info` / `--info-bg` CSS variables (renamed conceptually, not renamed in code, to limit blast radius) — see `.deload-note` and the `DELOAD` badge in `app.html`.
-- **Failure (individual failed rep/set — a true, immediate technical fact about that one set, not a judgment about the person or the program):** `--danger` stays red (`#D6604F`, warmed slightly from the old `#e05252`). This is intentionally NOT unified with the gentle-warning treatment — a 0-rep set genuinely failed; a deload or ramp-back session did not.
-- **Dark mode:** this is a dark-first system — there is no light mode in the shipped app. (The design-preview HTML artifact includes a light variant for reference/exploration only; it was not carried into the product.)
+- **Background:** `#EDE6DC` — warm sand, the page ground.
+- **Surface:** `#FDFAF7` (cards, white that pops off the sand) / `#F0E8DC` (secondary/idle set buttons) / `#DDD3C4` (borders).
+- **Text:** `#1E1510` primary (very dark warm brown) / `#8A7860` muted / `#B8A898` faint.
+- **Accent (brand/interactive):** `#C07840` — copper, slightly deeper than the old dark-mode value for legibility on light. Confident, not gym-red, not SaaS-purple.
+- **Success:** `#5A7A5E` — muted moss, no neon/confetti energy.
+- **Gentle warning (deload / ramp-back — semantically distinct from real errors):** `#5A60AB` — dusty slate-periwinkle (darkened from the originally-chosen `#8B8FC4` to clear WCAG AA contrast once the app moved to a light background). **Deliberately outside the entire amber-red "caution" family.** Two independent AI design reviewers (Claude subagent, Codex/GPT-5.1) converged on this same idea unprompted — treat that convergence as a strong signal, not a coincidence. In code this reuses the `--info` / `--info-bg` CSS variables.
+- **Failure (individual failed rep/set — a true, immediate technical fact about that one set, not a judgment about the person or the program):** `--danger` stays red (`#C05040`, warmed). This is intentionally NOT unified with the gentle-warning treatment — a 0-rep set genuinely failed; a deload or ramp-back session did not.
+- **Light mode:** this is now a light-first system. The previous dark palette (`#161311` background, `#F2EEE8` text) is retired from the shipped app.
 
 ## Spacing
 - **Base unit:** 8px.
@@ -39,8 +40,8 @@ Renamed from "2x5strong" to **Never Behind**. Prior name paralleled StrongLifts 
 - **Scale:** 8 / 16 / 24 / 32 / 48 / 64.
 
 ## Layout
-- **Approach:** Composition-first for the daily logging screen — one dominant number (today's work weight), not a stat grid.
-- **Sets:** warmup and work sets render as one continuous ladder of rows, not separate cards.
+- **Approach:** Per-exercise cards on a sand background — white cards pop off the page ground. One card per exercise, generous padding (16px), 14px gap between cards.
+- **Sets:** rendered as a horizontal row of pill-shaped buttons below the weight number. Pill buttons are wide (full-width row distributed), 44px tall (bumped from the original 40px mockup to clear the WCAG minimum touch-target size), rounded-full. Idle = warm off-white `#F0E8DC` with border, done = filled moss, fail = filled red.
 - **Ramp-back note:** shown inline as a small italic annotation next to the weight number, in gentle-warning color — **never a banner, never a modal, never red.**
 - **No stat-walls, streaks, or achievement badges anywhere** — including any future marketing/landing page. This is a hard rule, not a style preference: a streak counter is structurally a judgment machine (a broken streak is a small public failure event), which is incompatible with "it doesn't judge me for a bad day."
 
@@ -58,3 +59,5 @@ Two overlapping circles (small `r=13` at `(18,42)`, large `r=21` at `(40,22)` in
 | 2026-08-21 | Dark warm-instrument aesthetic over gym-bravado or clinical-wellness | Category converges on stat-flexing/achievement bravado, which structurally contradicts "it doesn't judge me for a bad day" |
 | 2026-08-21 | Gentle-warning color deliberately outside amber-red family | Converged on independently by two AI design reviewers; prevents deload/ramp-back from ever visually reading as an error |
 | 2026-08-21 | Root color tokens swapped in `css/style.css`; font migration deferred | Color swap is low-risk (value-only); font swap requires auditing weight/letter-spacing assumptions across a large embedded stylesheet — scoped as follow-up work |
+| 2026-08-22 | Switched from dark-first to light-first (warm sand + white cards) | Dark variants tested in /design-shotgun felt too heavy (copper too dominant on dark); light "Morning" variant (LC) selected as the approved direction |
+| 2026-08-22 | Pill-shaped set buttons over square set buttons | LC mockup; more tactile and finger-friendly on mobile, consistent with the premium-journal feel |

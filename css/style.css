@@ -1,39 +1,42 @@
 /* ============================================================
-   2x5 STRONG — Shared Styles
+   Never Behind — Shared Styles
    ============================================================ */
 
-@import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;500;600;700;900&family=Barlow:ital,wght@0,400;0,500;1,400&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500&family=Instrument+Sans:wght@400;500;600&family=Geist:wght@400;500;600&display=swap');
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
-  --bg: #161311;
-  --surface: #1E1A17;
-  --surface2: #262019;
-  --surface3: #332C24;
-  --border: #332C24;
-  --border2: #443A2E;
-  --accent: #D68B4A;
-  --accent-dim: #B87A3E;
-  --accent-bg: rgba(214,139,74,0.08);
-  --text: #F2EEE8;
-  --muted: #948C81;
-  --muted2: #6B6255;
-  --danger: #D6604F;
-  --danger-bg: rgba(214,96,79,0.1);
-  --success: #6B9071;
-  --success-bg: rgba(107,144,113,0.12);
+  --bg: #EDE6DC;
+  --surface: #FDFAF7;
+  --surface2: #F0E8DC;
+  --surface3: #DDD3C4;
+  --border: #DDD3C4;
+  --border2: #C4B49A;
+  --accent: #C07840;
+  --accent-dim: #A06030;
+  --accent-text: #925B30;
+  --accent-bg: rgba(192,120,64,0.08);
+  --text: #1E1510;
+  --muted: #695B49;
+  --muted2: #756351;
+  --danger: #C05040;
+  --danger-bg: rgba(192,80,64,0.1);
+  --success: #5A7A5E;
+  --success-bg: rgba(90,122,94,0.12);
   /* "info" is this app's gentle-warning tone — used for deload/ramp-back
      states specifically. Deliberately a slate-periwinkle, not amber/red:
      scaling back after a layoff isn't a failure, so it can't share a hue
      with anything that reads as an alarm. See DESIGN.md. */
-  --info: #8B8FC4;
-  --info-bg: rgba(139,143,196,0.12);
-  --font-d: 'Barlow Condensed', sans-serif;
-  --font-b: 'Barlow', sans-serif;
+  --info: #5A60AB;
+  --info-bg: rgba(90,96,171,0.12);
+  --font-d: 'Fraunces', Georgia, serif;
+  --font-b: 'Instrument Sans', system-ui, sans-serif;
+  --font-m: 'Geist', system-ui, sans-serif;
   --radius: 12px;
   --radius-sm: 8px;
   --radius-lg: 16px;
+  --radius-pill: 999px;
 }
 
 html, body {
@@ -46,12 +49,12 @@ html, body {
   -webkit-font-smoothing: antialiased;
 }
 
-a { color: var(--accent); text-decoration: none; }
+a { color: var(--accent-text); text-decoration: none; }
 a:hover { text-decoration: underline; }
 
 /* ── Typography ── */
 .font-display { font-family: var(--font-d); }
-h1,h2,h3 { font-family: var(--font-d); font-weight: 900; letter-spacing: 0.5px; }
+h1,h2,h3 { font-family: var(--font-d); font-weight: 500; letter-spacing: -0.2px; }
 
 /* ── Layout ── */
 .container {
@@ -75,10 +78,10 @@ h1,h2,h3 { font-family: var(--font-d); font-weight: 900; letter-spacing: 0.5px; 
 }
 .nav-brand {
   font-family: var(--font-d);
-  font-size: 22px;
-  font-weight: 900;
-  letter-spacing: 1px;
-  color: var(--accent);
+  font-size: 20px;
+  font-weight: 500;
+  letter-spacing: -0.2px;
+  color: var(--accent-text);
 }
 .nav-brand span { color: var(--muted); font-weight: 400; }
 
@@ -98,11 +101,11 @@ h1,h2,h3 { font-family: var(--font-d); font-weight: 900; letter-spacing: 0.5px; 
   justify-content: center;
   gap: 8px;
   padding: 12px 20px;
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-pill);
   border: none;
-  font-family: var(--font-d);
-  font-size: 16px;
-  font-weight: 700;
+  font-family: var(--font-b);
+  font-size: 14px;
+  font-weight: 600;
   letter-spacing: 0.5px;
   cursor: pointer;
   transition: opacity 0.12s, transform 0.1s;
@@ -110,7 +113,7 @@ h1,h2,h3 { font-family: var(--font-d); font-weight: 900; letter-spacing: 0.5px; 
 }
 .btn:active { transform: scale(0.98); }
 .btn:disabled { opacity: 0.4; cursor: default; transform: none; }
-.btn-primary { background: var(--accent); color: #000; width: 100%; }
+.btn-primary { background: var(--accent); color: var(--text); width: 100%; }
 .btn-primary:hover:not(:disabled) { opacity: 0.9; }
 .btn-ghost { background: var(--surface2); color: var(--muted); border: 1px solid var(--border); }
 .btn-ghost:hover:not(:disabled) { border-color: var(--border2); color: var(--text); }
@@ -122,8 +125,8 @@ h1,h2,h3 { font-family: var(--font-d); font-weight: 900; letter-spacing: 0.5px; 
 .form-group { margin-bottom: 16px; }
 .form-label {
   display: block;
-  font-family: var(--font-d);
-  font-size: 12px;
+  font-family: var(--font-b);
+  font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.8px;
   text-transform: uppercase;
@@ -158,8 +161,8 @@ h1,h2,h3 { font-family: var(--font-d); font-weight: 900; letter-spacing: 0.5px; 
   display: flex;
   align-items: center;
   justify-content: center;
-  font-family: var(--font-d);
-  font-weight: 900;
+  font-family: var(--font-b);
+  font-weight: 600;
   flex-shrink: 0;
 }
 .avatar-sm { width: 32px; height: 32px; font-size: 13px; }
@@ -169,15 +172,15 @@ h1,h2,h3 { font-family: var(--font-d); font-weight: 900; letter-spacing: 0.5px; 
 /* ── Badges ── */
 .badge {
   display: inline-block;
-  font-family: var(--font-d);
+  font-family: var(--font-b);
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: 0.5px;
   text-transform: uppercase;
   border-radius: 4px;
   padding: 2px 7px;
 }
-.badge-accent { background: var(--accent); color: #000; }
+.badge-accent { background: var(--accent); color: var(--text); }
 .badge-danger { background: var(--danger-bg); color: var(--danger); }
 .badge-info { background: var(--info-bg); color: var(--info); }
 .badge-success { background: var(--success-bg); color: var(--success); }
@@ -205,16 +208,16 @@ h1,h2,h3 { font-family: var(--font-d); font-weight: 900; letter-spacing: 0.5px; 
   background: transparent;
   border: none;
   color: var(--muted);
-  font-family: var(--font-d);
-  font-size: 10px;
+  font-family: var(--font-b);
+  font-size: 9px;
   font-weight: 600;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.8px;
   text-transform: uppercase;
   cursor: pointer;
   transition: color 0.12s;
 }
 .bnav-btn svg { width: 22px; height: 22px; stroke: currentColor; fill: none; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
-.bnav-btn.active { color: var(--accent); }
+.bnav-btn.active { color: var(--accent-text); }
 
 /* ── Toast ── */
 .toast {
@@ -280,7 +283,7 @@ h1,h2,h3 { font-family: var(--font-d); font-weight: 900; letter-spacing: 0.5px; 
 
 /* ── Utility ── */
 .text-muted { color: var(--muted); }
-.text-accent { color: var(--accent); }
+.text-accent { color: var(--accent-text); }
 .text-danger { color: var(--danger); }
 .text-success { color: var(--success); }
 .text-center { text-align: center; }

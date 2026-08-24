@@ -26,10 +26,10 @@
     }
     .loading-brand {
       font-family: var(--font-d);
-      font-size: 32px;
-      font-weight: 900;
-      letter-spacing: 1px;
-      color: var(--accent);
+      font-size: 30px;
+      font-weight: 500;
+      letter-spacing: -0.3px;
+      color: var(--accent-text);
     }
     .loading-brand span { color: var(--muted); font-weight: 400; }
 
@@ -49,8 +49,8 @@
     /* ── Workout tab ──────────────────────────────────── */
     .workout-header { margin-bottom: 24px; }
     .workout-day-label {
-      font-family: var(--font-d);
-      font-size: 12px;
+      font-family: var(--font-b);
+      font-size: 11px;
       font-weight: 600;
       letter-spacing: 1.5px;
       text-transform: uppercase;
@@ -70,7 +70,7 @@
       align-items: center;
       transition: color 0.12s, transform 0.15s;
     }
-    .day-switch-btn:hover { color: var(--accent); transform: rotate(90deg); }
+    .day-switch-btn:hover { color: var(--accent-text); transform: rotate(90deg); }
     .day-switch-btn svg { width: 14px; height: 14px; }
 
     .workout-day-label::before {
@@ -82,10 +82,10 @@
     }
     .workout-title {
       font-family: var(--font-d);
-      font-size: 44px;
-      font-weight: 900;
-      letter-spacing: 1px;
-      line-height: 1;
+      font-size: 38px;
+      font-weight: 500;
+      letter-spacing: -0.5px;
+      line-height: 1.1;
     }
     .workout-subtitle {
       color: var(--muted);
@@ -94,7 +94,7 @@
     }
 
     /* ── Lift cards ───────────────────────────────────── */
-    .lifts { display: flex; flex-direction: column; gap: 12px; margin-bottom: 24px; }
+    .lifts { display: flex; flex-direction: column; gap: 14px; margin-bottom: 24px; }
 
     .lift-card {
       background: var(--surface);
@@ -115,9 +115,9 @@
     }
     .lift-name {
       font-family: var(--font-d);
-      font-size: 22px;
-      font-weight: 700;
-      letter-spacing: 0.5px;
+      font-size: 21px;
+      font-weight: 500;
+      letter-spacing: -0.2px;
       line-height: 1.2;
     }
     .lift-warn {
@@ -130,19 +130,23 @@
 
     .lift-weight-block { text-align: right; flex-shrink: 0; }
     .lift-weight {
-      font-family: var(--font-d);
-      font-size: 38px;
-      font-weight: 900;
-      color: var(--accent);
+      font-family: var(--font-m);
+      font-variant-numeric: tabular-nums;
+      font-size: 34px;
+      font-weight: 600;
+      color: var(--accent-text);
       line-height: 1;
     }
     .lift-weight span {
-      font-size: 18px;
+      font-family: var(--font-b);
+      font-size: 16px;
       font-weight: 500;
       color: var(--accent-dim);
       margin-left: 2px;
     }
     .lift-prescription {
+      font-family: var(--font-m);
+      font-variant-numeric: tabular-nums;
       font-size: 12px;
       color: var(--muted);
       margin-top: 2px;
@@ -152,26 +156,37 @@
       display: flex;
       align-items: center;
       gap: 8px;
+      flex-wrap: wrap;
     }
     .set-btn {
-      width: 42px; height: 42px;
-      border-radius: 8px;
-      border: 1.5px solid var(--border);
+      flex: 1;
+      min-width: 40px;
+      height: 44px;
+      border-radius: var(--radius-pill);
+      border: 1.5px solid var(--border2);
       background: var(--surface2);
       color: var(--muted);
-      font-family: var(--font-d);
-      font-size: 16px;
-      font-weight: 700;
+      font-family: var(--font-b);
+      font-size: 14px;
+      font-weight: 600;
       cursor: pointer;
       transition: all 0.12s;
       display: flex;
       align-items: center;
       justify-content: center;
     }
-    .set-btn:hover:not(.done):not(.fail) { border-color: var(--accent); color: var(--accent); }
-    .set-btn.done { background: var(--success); border-color: var(--success); color: #000; }
+    .set-btn:hover:not(.done):not(.fail) { border-color: var(--accent); color: var(--accent-text); }
+    .set-btn.done {
+      background: var(--success); border-color: var(--success); color: #fff;
+      animation: fade-to-check 0.28s ease-out;
+    }
+    @keyframes fade-to-check {
+      from { background: var(--surface2); border-color: var(--border2); color: var(--muted); }
+      to   { background: var(--success); border-color: var(--success); color: #fff; }
+    }
+    @media (prefers-reduced-motion: reduce) { .set-btn.done { animation: none; } }
     .set-btn.fail { background: var(--danger); border-color: var(--danger); color: #fff; }
-    .set-btn.partial { background: var(--accent-bg); border-color: var(--accent-dim); color: var(--accent); }
+    .set-btn.partial { background: var(--accent-bg); border-color: var(--accent-dim); color: var(--accent-text); }
     .set-btn.locked { background: transparent; border-color: var(--border); color: var(--muted2); cursor: not-allowed; opacity: 0.4; }
     .set-btn.optional { border-style: dashed; opacity: 0.5; }
     .set-btn.optional:hover { opacity: 0.85; }
@@ -193,8 +208,8 @@
     .accessories-title {
       font-family: var(--font-d);
       font-size: 18px;
-      font-weight: 700;
-      letter-spacing: 0.5px;
+      font-weight: 500;
+      letter-spacing: 0;
     }
     .accessories-title span {
       font-size: 13px;
@@ -213,13 +228,13 @@
       border-radius: var(--radius-sm);
       padding: 7px 14px;
       color: var(--text);
-      font-family: var(--font-d);
-      font-size: 14px;
+      font-family: var(--font-b);
+      font-size: 13px;
       font-weight: 600;
       cursor: pointer;
       transition: border-color 0.12s;
     }
-    .add-accessory-btn:hover { border-color: var(--accent); color: var(--accent); }
+    .add-accessory-btn:hover { border-color: var(--accent); color: var(--accent-text); }
 
     .accessory-list { display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px; }
 
@@ -238,10 +253,10 @@
     .accessory-name {
       font-family: var(--font-d);
       font-size: 18px;
-      font-weight: 700;
+      font-weight: 500;
     }
     .accessory-type-badge {
-      font-family: var(--font-d);
+      font-family: var(--font-b);
       font-size: 11px;
       font-weight: 600;
       letter-spacing: 0.5px;
@@ -273,8 +288,8 @@
       font-size: 13px;
     }
     .accessory-set-num {
-      font-family: var(--font-d);
-      font-weight: 700;
+      font-family: var(--font-m);
+      font-weight: 600;
       color: var(--muted2);
       min-width: 24px;
     }
@@ -310,7 +325,7 @@
       padding: 5px 12px;
       color: var(--muted);
       font-size: 12px;
-      font-family: var(--font-d);
+      font-family: var(--font-b);
       font-weight: 600;
       letter-spacing: 0.5px;
       cursor: pointer;
@@ -318,7 +333,7 @@
       width: 100%;
       text-align: center;
     }
-    .add-set-btn:hover { border-color: var(--accent); color: var(--accent); }
+    .add-set-btn:hover { border-color: var(--accent); color: var(--accent-text); }
 
     /* Suggestions strip */
     .suggestions-strip {
@@ -338,7 +353,7 @@
       transition: border-color 0.12s, color 0.12s;
       white-space: nowrap;
     }
-    .suggestion-chip:hover { border-color: var(--accent); color: var(--accent); }
+    .suggestion-chip:hover { border-color: var(--accent); color: var(--accent-text); }
     .suggestion-chip.suggested { border-color: var(--info); color: var(--info); }
 
     /* Exercise picker modal */
@@ -387,23 +402,23 @@
       border-radius: 16px;
       padding: 3px 12px;
       font-size: 12px;
-      font-family: var(--font-d);
+      font-family: var(--font-b);
       font-weight: 600;
       letter-spacing: 0.3px;
       color: var(--muted);
       cursor: pointer;
       transition: all 0.12s;
     }
-    .cat-btn.active { background: var(--accent); border-color: var(--accent); color: #000; }
+    .cat-btn.active { background: var(--accent); border-color: var(--accent); color: var(--text); }
     .picker-list {
       overflow-y: auto;
       flex: 1;
       padding: 0 20px;
     }
     .picker-category-label {
-      font-family: var(--font-d);
+      font-family: var(--font-b);
       font-size: 11px;
-      font-weight: 700;
+      font-weight: 600;
       letter-spacing: 1px;
       text-transform: uppercase;
       color: var(--muted2);
@@ -421,11 +436,11 @@
       cursor: pointer;
       transition: color 0.12s;
     }
-    .picker-exercise:hover .picker-ex-name { color: var(--accent); }
+    .picker-exercise:hover .picker-ex-name { color: var(--accent-text); }
     .picker-ex-name { font-size: 14px; font-weight: 500; }
     .picker-ex-type {
       font-size: 11px;
-      font-family: var(--font-d);
+      font-family: var(--font-b);
       font-weight: 600;
       letter-spacing: 0.5px;
       text-transform: uppercase;
@@ -505,7 +520,7 @@
       transition: border-color 0.12s, color 0.12s;
       margin-top: 4px;
     }
-    .movement-day-btn:hover { border-color: var(--accent); color: var(--accent); }
+    .movement-day-btn:hover { border-color: var(--accent); color: var(--accent-text); }
 
     /* ── Movement day modal ──────────────────────────── */
     .movement-modal {
@@ -546,12 +561,12 @@
     .movement-ex-name {
       font-family: var(--font-d);
       font-size: 20px;
-      font-weight: 700;
+      font-weight: 500;
     }
     .movement-ex-cat {
-      font-family: var(--font-d);
+      font-family: var(--font-b);
       font-size: 11px;
-      font-weight: 700;
+      font-weight: 600;
       letter-spacing: 0.5px;
       text-transform: uppercase;
       padding: 2px 8px;
@@ -581,18 +596,19 @@
     .metcon-move-row:nth-child(odd) { background: var(--surface2); }
     .metcon-move-name { color: var(--text); font-weight: 500; }
     .metcon-move-reps {
-      font-family: var(--font-d);
-      font-weight: 700;
+      font-family: var(--font-m);
+      font-weight: 600;
       color: var(--danger);
       font-size: 14px;
     }
     .cat-Pull { background: var(--info-bg); color: var(--info); }
     .cat-Hinge, .cat-Core { background: var(--success-bg); color: var(--success); }
     .movement-ex-prescription {
-      font-family: var(--font-d);
-      font-size: 16px;
+      font-family: var(--font-m);
+      font-variant-numeric: tabular-nums;
+      font-size: 15px;
       font-weight: 600;
-      color: var(--accent);
+      color: var(--accent-text);
       margin-bottom: 4px;
     }
     .movement-ex-note { font-size: 13px; color: var(--muted); font-style: italic; }
@@ -623,7 +639,7 @@
     .edit-lift-name {
       font-family: var(--font-d);
       font-size: 17px;
-      font-weight: 700;
+      font-weight: 500;
       margin-bottom: 8px;
     }
     .edit-weight-row {
@@ -651,7 +667,8 @@
     .edit-set-cell label {
       font-size: 10px;
       color: var(--muted2);
-      font-family: var(--font-d);
+      font-family: var(--font-b);
+      font-weight: 600;
       text-transform: uppercase;
     }
 
@@ -662,9 +679,9 @@
       border-bottom: 1px dashed var(--border);
     }
     .warmup-label, .work-sets-label {
-      font-family: var(--font-d);
+      font-family: var(--font-b);
       font-size: 11px;
-      font-weight: 700;
+      font-weight: 600;
       letter-spacing: 1px;
       text-transform: uppercase;
       color: var(--muted2);
@@ -709,25 +726,26 @@
       align-items: center;
       justify-content: center;
       font-size: 11px;
-      font-weight: 700;
+      font-weight: 600;
       color: var(--success);
       transition: border-color 0.12s, background 0.12s;
     }
     .warmup-done .warmup-check {
       background: var(--success);
       border-color: var(--success);
-      color: #000;
+      color: #fff;
     }
     .warmup-weight {
-      font-family: var(--font-d);
-      font-size: 20px;
-      font-weight: 700;
+      font-family: var(--font-m);
+      font-variant-numeric: tabular-nums;
+      font-size: 18px;
+      font-weight: 600;
       color: var(--muted);
       min-width: 64px;
       cursor: pointer;
       border-bottom: 1px dashed var(--muted2);
     }
-    .warmup-weight:hover { color: var(--accent); border-color: var(--accent); }
+    .warmup-weight:hover { color: var(--accent-text); border-color: var(--accent); }
     .warmup-done .warmup-weight { color: var(--text); }
     .warmup-unit {
       font-size: 12px;
@@ -741,7 +759,7 @@
       cursor: pointer;
       border-bottom: 1px dashed transparent;
     }
-    .warmup-reps:hover { color: var(--accent); border-bottom-color: var(--accent); }
+    .warmup-reps:hover { color: var(--accent-text); border-bottom-color: var(--accent); }
     .warmup-done .warmup-reps { color: var(--muted); }
     .sets-count {
       font-size: 12px;
@@ -754,13 +772,13 @@
       width: 100%;
       padding: 17px;
       background: var(--accent);
-      color: #000;
+      color: var(--text);
       border: none;
-      border-radius: var(--radius);
-      font-family: var(--font-d);
-      font-size: 20px;
-      font-weight: 900;
-      letter-spacing: 1px;
+      border-radius: var(--radius-pill);
+      font-family: var(--font-b);
+      font-size: 15px;
+      font-weight: 600;
+      letter-spacing: 0.8px;
       cursor: pointer;
       transition: opacity 0.12s;
       display: flex;
@@ -788,7 +806,7 @@
       padding: 14px;
     }
     .stat-label {
-      font-family: var(--font-d);
+      font-family: var(--font-b);
       font-size: 11px;
       font-weight: 600;
       letter-spacing: 0.8px;
@@ -797,9 +815,10 @@
       margin-bottom: 4px;
     }
     .stat-val {
-      font-family: var(--font-d);
-      font-size: 28px;
-      font-weight: 900;
+      font-family: var(--font-m);
+      font-variant-numeric: tabular-nums;
+      font-size: 26px;
+      font-weight: 600;
     }
 
     .history-list { display: flex; flex-direction: column; gap: 10px; }
@@ -811,9 +830,9 @@
       margin-bottom: 8px;
     }
     .history-day {
-      font-family: var(--font-d);
-      font-size: 16px;
-      font-weight: 700;
+      font-family: var(--font-b);
+      font-size: 14px;
+      font-weight: 600;
     }
     .history-date {
       font-size: 12px;
@@ -837,9 +856,9 @@
     /* ── Settings tab ─────────────────────────────────── */
     .settings-section { margin-bottom: 28px; }
     .settings-section-title {
-      font-family: var(--font-d);
-      font-size: 13px;
-      font-weight: 700;
+      font-family: var(--font-b);
+      font-size: 12px;
+      font-weight: 600;
       letter-spacing: 1px;
       text-transform: uppercase;
       color: var(--muted2);
@@ -863,9 +882,9 @@
     /* ── Section title ────────────────────────────────── */
     .section-title {
       font-family: var(--font-d);
-      font-size: 28px;
-      font-weight: 900;
-      letter-spacing: 1px;
+      font-size: 26px;
+      font-weight: 500;
+      letter-spacing: -0.3px;
       margin-bottom: 16px;
     }
 
@@ -909,22 +928,23 @@
       gap: 16px;
     }
     .timer-display { display: flex; align-items: center; gap: 20px; flex: 1; }
-    .timer-display.running .timer-total { color: var(--accent); }
+    .timer-display.running .timer-total { color: var(--accent-text); }
     .timer-block { display: flex; flex-direction: column; }
     .timer-label {
-      font-family: var(--font-d);
+      font-family: var(--font-b);
       font-size: 10px;
-      font-weight: 700;
+      font-weight: 600;
       letter-spacing: 1px;
       text-transform: uppercase;
       color: var(--muted2);
       margin-bottom: 2px;
     }
     .timer-value {
-      font-family: var(--font-d);
-      font-size: 28px;
-      font-weight: 900;
-      letter-spacing: 1px;
+      font-family: var(--font-m);
+      font-variant-numeric: tabular-nums;
+      font-size: 26px;
+      font-weight: 600;
+      letter-spacing: 0;
       color: var(--muted);
       line-height: 1;
     }
@@ -939,13 +959,13 @@
       align-items: center;
       gap: 6px;
       background: var(--accent);
-      color: #000;
+      color: var(--text);
       border: none;
-      border-radius: var(--radius-sm);
+      border-radius: var(--radius-pill);
       padding: 8px 14px;
-      font-family: var(--font-d);
-      font-size: 14px;
-      font-weight: 700;
+      font-family: var(--font-b);
+      font-size: 13px;
+      font-weight: 600;
       letter-spacing: 0.5px;
       cursor: pointer;
       white-space: nowrap;
