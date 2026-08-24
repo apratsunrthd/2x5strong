@@ -929,7 +929,10 @@
       position: sticky;
       top: var(--nav-h);
       z-index: 40;
-      border-bottom: 1px solid var(--border2);
+    }
+    .timer-bar.is-stuck {
+      border-radius: 0 0 var(--radius) var(--radius);
+      border-bottom-color: var(--border2);
     }
     .timer-display { display: flex; align-items: center; gap: 20px; flex: 1; }
     .timer-display.running .timer-total { color: var(--accent-text); }
@@ -1028,6 +1031,7 @@
         </div>
       </div>
       <!-- Timer bar -->
+      <div id="timer-sticky-sentinel" style="height:0;visibility:hidden;"></div>
       <div class="timer-bar">
         <div class="timer-display" id="timer-display">
           <div class="timer-block">
