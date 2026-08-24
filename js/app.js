@@ -253,6 +253,15 @@ async function init() {
   document.getElementById('app-loading').style.display = 'none';
   document.getElementById('app-content').style.display = 'block';
 
+  const timerSentinel = document.getElementById('timer-sticky-sentinel');
+  if (timerSentinel) {
+    const timerBar = timerSentinel.nextElementSibling;
+    new IntersectionObserver(
+      ([e]) => timerBar.classList.toggle('is-stuck', !e.isIntersecting),
+      { rootMargin: `-${getComputedStyle(document.documentElement).getPropertyValue('--nav-h').trim()} 0px 0px 0px`, threshold: 0 }
+    ).observe(timerSentinel);
+  }
+
   // Check session timing after a brief delay so UI is visible first
   setTimeout(() => checkSessionTiming(), 300);
 }

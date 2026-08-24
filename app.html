@@ -20,7 +20,7 @@
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      min-height: calc(100vh - 52px);
+      min-height: calc(100vh - var(--nav-h));
       gap: 16px;
       color: var(--muted);
     }
@@ -926,6 +926,13 @@
       padding: 12px 16px;
       margin-bottom: 20px;
       gap: 16px;
+      position: sticky;
+      top: var(--nav-h);
+      z-index: 40;
+    }
+    .timer-bar.is-stuck {
+      border-radius: 0 0 var(--radius) var(--radius);
+      border-bottom-color: var(--border2);
     }
     .timer-display { display: flex; align-items: center; gap: 20px; flex: 1; }
     .timer-display.running .timer-total { color: var(--accent-text); }
@@ -1024,6 +1031,7 @@
         </div>
       </div>
       <!-- Timer bar -->
+      <div id="timer-sticky-sentinel" style="height:0;visibility:hidden;"></div>
       <div class="timer-bar">
         <div class="timer-display" id="timer-display">
           <div class="timer-block">
