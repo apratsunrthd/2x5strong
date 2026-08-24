@@ -912,6 +912,7 @@ window.confirmFinish = async function() {
     personalRecords = await getPersonalRecords(user.id);
 
     clearDraftSession();
+    clearRampBackDraft(); // stale plan from before/during this session is now outdated
     toast('Session saved!', 'success');
     resetTimer();
     initSession();
@@ -1819,7 +1820,11 @@ async function analyzeRampBackGaps() {
 
       if (!lastFullByLift[l.lift_id]) {
         const recorded = (l.sets_json || []).filter(v => v !== null && v !== 'locked');
-        const isFull = recorded.length > 0 && recorded.length === (l.sets_json || []).length && recorded.every(v => v === 5);
+        // A ramp-back session (e.g. 4×5 stored as [5,5,5,5,null]) intentionally
+        // leaves optional slots null, so requiring recorded.length === sets_json.length
+        // would never count ramp-back wins as "full." Require ≥4 sets all at 5 reps
+        // instead — this covers both a genuine 5×5 and a ramp-back 4×5 target hit.
+        const isFull = recorded.length >= 4 && recorded.every(v => v === 5);
         if (isFull) {
           const vol = computeSessionVolume(l);
           lastFullByLift[l.lift_id] = { date: s.completed_at, weight: l.weight, volume: vol.total };
@@ -1865,6 +1870,7 @@ async function analyzeRampBackGaps() {
 
 function buildRampBackPrompt(gaps, minIncrement) {
   const now = Date.now();
+  const pendingRampBack = getPendingRampBack();
 
   const lifts = gaps.map(g => {
     const daysSinceFull = g.lastFull
@@ -1898,7 +1904,12 @@ function buildRampBackPrompt(gaps, minIncrement) {
       ? `Warmups completed that session: ${g.mostRecent.warmupSummary}`
       : 'No warmup data recorded for that session';
 
-    return `${g.name}:\n  Current stored target weight: ${g.currentWeight}lb (do NOT treat this as proven — it may be stale from before a layoff)\n  ${lastFullStr}\n  ${recentStr}\n  ${warmupStr}`;
+    const pendingEntry = pendingRampBack[g.liftId];
+    const pendingStr = pendingEntry
+      ? `Active ramp-back progression: already building up to ${pendingEntry.sets} set(s). Do NOT recommend fewer than ${pendingEntry.sets} sets — regressing here would undo achieved progress.`
+      : '';
+
+    return `${g.name}:\n  Current stored target weight: ${g.currentWeight}lb (do NOT treat this as proven — it may be stale from before a layoff)\n  ${lastFullStr}\n  ${recentStr}\n  ${warmupStr}${pendingStr ? '\n  ' + pendingStr : ''}`;
   }).join('\n\n');
 
   return `You are a strength coach helping an athlete safely rebuild back to a standard 5 sets x 5 reps barbell program after a layoff or a rough patch. The goal is STRENGTH — get them back to full 5x5 as efficiently as is SAFE.
@@ -1917,7 +1928,8 @@ Rules — follow layoff severity strictly:
 5. If their most recent actual session already shows failed reps at a given weight, weight this more heavily than the layoff tier — don't recommend a weight they just failed.
 6. Volume trends matter: a much lower total volume in the most recent session vs. the last full 5x5 (even with matching reps) can indicate the weight is being felt more than the numbers alone show — factor this into how conservative to be.
 7. Warmup data is a secondary signal: if warmups were skipped or unusually light before a session, that MAY indicate more caution or time pressure, not necessarily reduced capacity — use it to inform tone/confidence in your note, not as a hard rule.
-8. One sentence of reasoning per lift that references the actual days-since-full number.
+8. If a lift shows "Active ramp-back progression: already building up to N set(s)", your recommended sets MUST be at least N. The athlete earned that volume — never recommend regression during an active ramp-back.
+9. One sentence of reasoning per lift that references the actual days-since-full number.
 
 Respond ONLY with valid JSON, no preamble, no markdown fences:
 {
